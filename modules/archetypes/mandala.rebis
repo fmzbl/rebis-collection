@@ -1,0 +1,189 @@
+; archetypes/mandala — a center and a differentiated field.
+;
+; A mandala is implemented as topology: north/south/east/west remain distinct
+; while a center relates them. The center is a mediator, not a command to
+; flatten tension. A field can include an inverted reading so the std-synthesis
+; is tested against its own orientation.
+(
+  (# archetypes/core)
+  (# archetypes/trickster)
+  (# std/canon)
+  (# std/committee)
+  (# std/dialectic)
+  (# std/map)
+  (# std/shape)
+
+  ; (arch-quadrant mediator north south east west) — arch-converge four directions
+  ; with a center while preserving the labels supplied by the host.
+  ;
+  ;   mediator   mediator over the readings below. A symbol mediates
+  ;              deterministically and fires no model; a prompt costs one call.
+  ;   north      the material under examination; read once per branch it
+  ;              appears in.
+  ;   south      the material under examination; read once per branch it
+  ;              appears in.
+  ;   east       the material under examination; read once per branch it
+  ;              appears in.
+  ;   west       the material under examination; read once per branch it
+  ;              appears in.
+  ;
+  ; Example:
+  ;   (arch-quadrant
+  ;     "Relate the four directions without erasing their differences."
+  ;     "safety"
+  ;     "speed"
+  ;     "user impact"
+  ;     "operator cost")
+  ;
+  ; Cost: all four branches run before mediation.
+  (~ arch-quadrant (mediator north south east west)
+    '(-> ([,mediator]
+          (-> ,north "Name the north direction and its strongest evidence.")
+          (-> ,south "Name the south direction and its strongest evidence.")
+          (-> ,east "Name the east direction and its strongest evidence.")
+          (-> ,west "Name the west direction and its strongest evidence."))
+         "Return a center statement that relates all four directions without making them identical."))
+
+  ; (arch-cross-of-opposites reconcile horizontal vertical) — read two axes in
+  ; both orientations, then compare the two completed crosses.
+  ;
+  ;   reconcile    mediator over the readings below. A symbol mediates
+  ;                deterministically and fires no model; a prompt costs one call.
+  ;   horizontal   the material under examination; read once per branch it
+  ;                appears in.
+  ;   vertical     the material under examination; read once per branch it
+  ;                appears in.
+  ;
+  ; Example:
+  ;   (arch-cross-of-opposites
+  ;     "Reconcile the two axes and preserve their tension."
+  ;     "delivery speed versus safety"
+  ;     "customer simplicity versus operator control")
+  ;
+  ; Cost: each axis participates in two dialectical passes.
+  (~ arch-cross-of-opposites (reconcile horizontal vertical)
+    '(-> ([,reconcile]
+          (std-diamond ,reconcile
+            (-> ,horizontal "Read the horizontal axis from premise to consequence.")
+            (-> ,vertical "Read the vertical axis from premise to consequence."))
+          (std-diamond ,reconcile
+            (<- ,horizontal "Read the horizontal axis from consequence back to premise.")
+            (<- ,vertical "Read the vertical axis from consequence back to premise."))
+          )
+         "Name the invariant that lets the two axes stay distinct while influencing each other."))
+
+  ; (arch-center-and-field center mediator north south east west) — put a
+  ; differentiated arch-quadrant inside a centered std-synthesis and ask what remains
+  ; irreducibly different.
+  ;
+  ;   center     mediator over the readings below. A symbol mediates
+  ;              deterministically and fires no model; a prompt costs one call.
+  ;   mediator   forwarded unchanged to arch-quadrant.
+  ;   north      forwarded unchanged to arch-quadrant.
+  ;   south      forwarded unchanged to arch-quadrant.
+  ;   east       forwarded unchanged to arch-quadrant.
+  ;   west       forwarded unchanged to arch-quadrant.
+  ;
+  ; Example:
+  ;   (arch-center-and-field
+  ;     "Name the center that can hold the field."
+  ;     "Synthesize the four readings."
+  ;     "reliability"
+  ;     "velocity"
+  ;     "clarity"
+  ;     "maintenance")
+  ;
+  ; Cost: arch-quadrant runs all directions, then the center adds a second
+  ; mediation and a distinction check.
+  (~ arch-center-and-field (center mediator north south east west)
+    '(-> ([,center]
+          (arch-quadrant ,mediator ,north ,south ,east ,west)
+          (-> (arch-quadrant ,mediator ,north ,south ,east ,west)
+              "Name the center that can relate the field without becoming one of its directions."))
+         "List the tension that the center must hold rather than resolve prematurely."))
+
+  ; (arch-mandala-review center mediator judge work) — compare an ordinary
+  ; field with a syntax-inverted field. judge is a one-argument macro returning
+  ; 0 or 1; arch-trickster-opposite provides the fixed inverter.
+  ;
+  ;   center     forwarded unchanged to arch-center-and-field.
+  ;   mediator   forwarded unchanged to arch-center-and-field.
+  ;   judge      a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;              ordinary question into that protocol; std/seam's std-gated-by
+  ;              makes the verdict mechanical and free.
+  ;   work       forwarded unchanged to arch-invert-frame.
+  ;
+  ; Example:
+  ;   (arch-mandala-review
+  ;     "Find the center that keeps the evidence connected."
+  ;     "Synthesize the field."
+  ;     std-binary
+  ;     "The rollout needs speed, safety, clarity, and low operator cost.")
+  ;
+  ; Cost: work is repeated in the judge and selected branch; the inverted
+  ; field is pure until its prompts execute.
+  (~ arch-mandala-review (center mediator judge work)
+    '(% (,judge ,work)
+      (-> (arch-center-and-field ,center ,mediator
+             ,work
+             (arch-invert-frame arch-trickster-opposite ,work)
+             ,work
+             (arch-invert-frame arch-trickster-opposite ,work))
+          "Return a center, four differentiated directions, and one test for the synthesis.")
+      (-> ,work
+          "Keep the ordinary work and name the missing direction that prevented synthesis.")))
+
+  ; (arch-mandala-work center mediator judge worker task) — the compact public
+  ; API: produce four differentiated worker readings, include an inverted
+  ; direction, and keep the std-synthesis only when the verifier accepts it.
+  ;
+  ;   center     forwarded unchanged to arch-center-and-field.
+  ;   mediator   forwarded unchanged to arch-center-and-field.
+  ;   judge      a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;              ordinary question into that protocol; std/seam's std-gated-by
+  ;              makes the verdict mechanical and free.
+  ;   worker     a one-argument caller macro, applied to the material.
+  ;   task       forwarded unchanged to arch-invert-frame.
+  ;
+  ; Example:
+  ;   (arch-mandala-work
+  ;     "Name the center that can hold the field."
+  ;     "Synthesize the directional readings."
+  ;     std-binary
+  ;     draft
+  ;     "Design the service boundary for the migration.")
+  ;
+  ; Cost: worker is intentionally reused four times, plus a judge and final
+  ; std-synthesis. This is a broad field std-audit, not a cheap prompt wrapper.
+  (~ arch-mandala-work (center mediator judge worker task)
+    '(% (,judge (,worker ,task))
+      (-> (arch-center-and-field ,center ,mediator
+             (-> (,worker ,task) "Read the task from reliability.")
+             (-> (,worker ,task) "Read the task from delivery speed.")
+             (-> (,worker ,task) "Read the task from user clarity.")
+             (arch-invert-frame arch-trickster-opposite (,worker ,task)))
+          "Return the centered design, the four directions, and the smallest test that could disprove the center.")
+      (-> (,worker ,task)
+          "Return the current design and one missing direction to investigate before synthesis.")))
+
+  ; (arch-field-input center mediator) — receive a host-supplied task and build a
+  ; four-direction field from it. This is useful for Kaos input chaining.
+  ;
+  ;   center     forwarded unchanged to arch-center-and-field.
+  ;   mediator   forwarded unchanged to arch-center-and-field.
+  ;
+  ; Example:
+  ;   (arch-field-input
+  ;     "Name the center that can hold the input."
+  ;     "Synthesize the four directions.")
+  ;
+  ; Cost: the input is reused across all four directions; no model call is
+  ; made to receive the host value.
+  (~ arch-field-input (center mediator)
+    '(& input
+      (arch-center-and-field ,center ,mediator
+        input
+        (arch-invert-frame arch-trickster-opposite input)
+        (-> input "Read the input from its user-impact direction.")
+        (-> input "Read the input from its operator-cost direction."))))
+)

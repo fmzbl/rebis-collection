@@ -1,0 +1,170 @@
+; archetypes/trickster — controlled disruption of a frame that has become
+; too certain.
+;
+; The trickster protocol is useful because Rebis has a real syntax inverter:
+; ^ exchanges forward and backflow orientation without making a semantic claim
+; about the model's answer. The collection pairs that operation with a
+; caller-supplied worker, judge, and boundary.
+(
+  (# archetypes/core)
+  (# std/canon)
+  (# std/dialectic)
+  (# std/gate)
+  (# std/search)
+  (# std/shape)
+
+  ; (arch-trickster-opposite value) — a reusable one-argument prompt macro for an
+  ; explicit opposite reading. It is also a valid inverter for arch-invert-frame.
+  ;
+  ;   value   the claim to reverse. Runs first; the opposite-reading prompt
+  ;           receives its answer as INPUT.
+  ;
+  ; Example:
+  ;   (arch-trickster-opposite "The deployment is safe to run today.")
+  ;
+  ; Cost: two calls — the claim, then the opposite reading of it.
+  (~ arch-trickster-opposite (value)
+    '(-> ,value
+         "State the strongest opposite claim and what evidence that opposite would predict."))
+
+  ; (arch-invert-frame inverter work) — std-apply Rebis syntax inversion to a
+  ; caller-supplied one-argument inverter and its work. The inverter must be a
+  ; bare macro symbol, such as arch-trickster-opposite or std/canon's std-invert.
+  ;
+  ;   inverter   a one-argument caller macro, applied to the material.
+  ;   work       the material under examination; read once per branch it
+  ;              appears in.
+  ;
+  ; Example:
+  ;   (arch-invert-frame
+  ;     arch-trickster-opposite
+  ;     "A single queue is the safest architecture.")
+  ;
+  ; Cost: inversion itself is pure; the expanded inverted worker can fire
+  ; whenever the resulting arrow or call executes.
+  (~ arch-invert-frame (inverter work)
+    '(^ (,inverter ,work)))
+
+  ; (arch-trickster-question lens work) — preserve the evidence in a frame while
+  ; changing one hidden assumption.
+  ;
+  ;   lens   mediator over the readings below. A symbol mediates
+  ;          deterministically and fires no model; a prompt costs one call.
+  ;   work   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-trickster-question
+  ;     "Find one assumption worth breaking without discarding evidence."
+  ;     "All clients can tolerate a five-minute outage.")
+  ;
+  ; Cost: the work is read through three branches.
+  (~ arch-trickster-question (lens work)
+    '(-> ([,lens]
+          (-> ,work
+              "Name the assumption that makes this frame feel certain.")
+          (-> ,work
+              "Alter exactly one assumption and describe the resulting frame.")
+          (-> ,work
+              "State which evidence remains valid after the disruption."))
+         "Return the changed question and the boundary that keeps the disruption useful."))
+
+  ; (arch-double-reading lens work) — compare an ordinary reading with the
+  ; orientation-dual of the same evidence.
+  ;
+  ;   lens   mediator over the readings below. A symbol mediates
+  ;          deterministically and fires no model; a prompt costs one call.
+  ;   work   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-double-reading
+  ;     "Mediate the ordinary and disrupted readings."
+  ;     "The cache should always prefer freshness over availability.")
+  ;
+  ; Cost: both orientations run before the mediator.
+  (~ arch-double-reading (lens work)
+    '(-> ([,lens]
+          (-> ,work
+              "Read the frame in its ordinary direction.")
+          (^ (-> ,work
+                 "Read the frame from consequence back to premise; expose what the reverse direction changes.")))
+         "Keep the evidence that survives both orientations and name the assumption that does not."))
+
+  ; (arch-bounded-disruption judge worker lens work) — use a disrupted question
+  ; only when judge accepts it; otherwise preserve a worker's ordinary result.
+  ;
+  ;   judge    a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;            ordinary question into that protocol; std/seam's std-gated-by
+  ;            makes the verdict mechanical and free.
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   lens     forwarded unchanged to arch-trickster-question.
+  ;   work     forwarded unchanged to arch-trickster-question.
+  ;
+  ; Example:
+  ;   (arch-bounded-disruption
+  ;     std-binary
+  ;     revise
+  ;     "Judge whether the changed assumption is still useful."
+  ;     "The service never needs backpressure.")
+  ;
+  ; Cost: the disrupted question is evaluated by judge and, on acceptance,
+  ; worker sees it; the ordinary fallback is lazy.
+  (~ arch-bounded-disruption (judge worker lens work)
+    '(% (,judge (arch-trickster-question ,lens ,work))
+      (-> (,worker (arch-trickster-question ,lens ,work))
+          "Turn the disruption into one bounded experiment.")
+      (-> (,worker ,work)
+          "Keep the ordinary frame, but name the assumption that remains untested.")))
+
+  ; (arch-trickster-lab inverter lens worker judge task) — build a normal
+  ; reading, make its inverted counterpart, mediate both, and revise only
+  ; when the disruption has a useful boundary.
+  ;
+  ;   inverter   forwarded unchanged to arch-invert-frame.
+  ;   lens       forwarded unchanged to arch-trickster-question.
+  ;   worker     a one-argument caller macro, applied to the material.
+  ;   judge      mediator over the readings below. A symbol mediates
+  ;              deterministically and fires no model; a prompt costs one call.
+  ;   task       forwarded unchanged to arch-trickster-question.
+  ;
+  ; Example:
+  ;   (arch-trickster-lab
+  ;     arch-trickster-opposite
+  ;     "Judge the evidence after the assumption changes."
+  ;     revise
+  ;     "Mediate the ordinary and inverted readings."
+  ;     "Design a deployment with no rollback.")
+  ;
+  ; Cost: worker fires for the ordinary reading and again inside the inverted
+  ; reading; judge selects the final continuation.
+  (~ arch-trickster-lab (inverter lens worker judge task)
+    '(-> ([,judge]
+          (-> (,worker ,task)
+              (arch-trickster-question ,lens (,worker ,task)))
+          (-> (arch-invert-frame ,inverter (,worker ,task))
+              "State the strongest useful lesson from the orientation dual."))
+         "Reconcile the ordinary and disrupted readings into a bounded revision."))
+
+  ; (arch-trickster-cycle inverter worker stop value) — repeatedly std-invert and
+  ; revise a value until stop accepts it. The conditional keeps the recursive
+  ; branch lazy.
+  ;
+  ;   inverter   forwarded unchanged to arch-trickster-cycle.
+  ;   worker     a one-argument caller macro, applied to the material.
+  ;   stop       a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;              ordinary question into that protocol; std/seam's std-gated-by
+  ;              makes the verdict mechanical and free.
+  ;   value      forwarded unchanged to arch-invert-frame.
+  ;
+  ; Example:
+  ;   (arch-trickster-cycle arch-trickster-opposite revise std-binary "Review the design.")
+  ;
+  ; Cost: geometric in rounds; use a strict stop rule and runtime budgets.
+  (~ arch-trickster-cycle (inverter worker stop value)
+    '(% (,stop ,value)
+      ,value
+      (arch-trickster-cycle ,inverter ,worker ,stop
+        (-> (arch-invert-frame ,inverter (,worker ,value))
+            "Revise the frame while keeping one explicit safety boundary."))))
+)

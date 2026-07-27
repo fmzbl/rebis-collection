@@ -1,0 +1,412 @@
+; git/workflow — repository work as a sequence of durable decisions.
+;
+; This module does not wrap git commands. A repository already has a command
+; language; Rebis adds a workflow language for the reasoning around those
+; commands. The public macros below turn intent, evidence, std-review, integration,
+; recovery, and release decisions into explicit programs.
+;
+; Every argument is syntax, not a string-only callback. A task can therefore be
+; a prompt, an arrow, a square, a port, or another macro call. The module uses
+; arrows whenever a later stage must receive an earlier answer, and uses square
+; branches when readings should stay independent until a mediator sees them.
+; The final prompt after a square is deliberately outside the square: it is a
+; post-mediation stage, not an accidental fourth branch.
+(
+  (# std/assurance)
+  (# std/canon)
+  (# std/committee)
+  (# std/dialectic)
+  (# std/loops)
+  (# std/shape)
+
+  ; (git-intent frame task) — make the change's purpose and invariants explicit
+  ; before anyone proposes a patch or a commit.
+  ;
+  ;   frame   a one-argument caller macro composing the directive; text-level,
+  ;           interpolated rather than fired.
+  ;   task    the change under consideration, read once.
+  ;
+  ; Example:
+  ;   (git-intent
+  ;     "Reconcile the intent statements without losing constraints."
+  ;     "Add a live progress chat to finished and running Kaos jobs.")
+  ;
+  ; The frame is normally a mediator prompt or a one-argument judging macro.
+  ; The task may already be a program whose result should be treated as the
+  ; change request. Four independent readings are std-reconciled, then a final
+  ; prompt turns that frame into a compact contract.
+  ;
+  ; Cost: the task is read four times, one mediator runs, and one contract
+  ; prompt runs. Repeated task syntax is intentional: it preserves dissent.
+  (~ git-intent (frame task)
+    '(-> ([,frame]
+          (-> ,task
+              "State the user-visible outcome this change must create. Separate the outcome from implementation preferences.")
+          (-> ,task
+              "List the invariants that must remain true before, during, and after this change. Mark each invariant observable.")
+          (-> ,task
+              "Identify the people, programs, files, and boundaries affected by this change. Name the smallest meaningful surface.")
+          (-> ,task
+              "Describe the evidence that would justify the change and the evidence that would falsify it. Include failure and rollback signals."))
+         "Write an intent contract with outcome, invariants, affected surface, evidence, and an explicit non-goal. Do not invent repository facts."))
+
+  ; (git-slice-change judge task) — choose atomic change boundaries rather than
+  ; treating a branch or a large patch as the unit of thought.
+  ;
+  ;   judge   mediator over the candidate slicings.
+  ;   task    the change to divide, read once per candidate.
+  ;
+  ; Example:
+  ;   (git-slice-change
+  ;     "Choose the smallest independently verifiable slices."
+  ;     "Move the parser diagnostics into a shared reporting layer.")
+  ;
+  ; This is useful before editing, when a requested change crosses API,
+  ; behavior, migration, documentation, and verification boundaries. It asks
+  ; for dependency order without pretending that order is a shell command.
+  ;
+  ; Cost: four analysis branches, one mediation, and one ordered-slice prompt.
+  (~ git-slice-change (judge task)
+    '(-> ([,judge]
+          (-> ,task
+              "Find the smallest coherent change slices. Each slice must have one intention and one observable verification.")
+          (-> ,task
+              "Separate behavior changes from refactors, generated artifacts, documentation, and migrations. Explain why each boundary matters.")
+          (-> ,task
+              "Build the dependency order among the slices. Identify which slice can be reviewed or reverted without the others.")
+          (-> ,task
+              "Name the risk of making each slice too small and the risk of making it too large. Recommend a boundary with evidence."))
+         "Return an ordered change map. For every slice give its intention, touched surface, invariant, verification, dependency, and rollback boundary."))
+
+  ; (git-change-plan judge task) — combine intent discovery with an executable
+  ; plan. The first stage's result flows into the planning square, so planners
+  ; receive the std-reconciled intent as INPUT rather than merely seeing a repeated
+  ; task string.
+  ;
+  ;   judge   mediator handed on to the slicing step.
+  ;   task    the change, read by intent discovery and by each slicing.
+  ;
+  ; Example:
+  ;   (git-change-plan
+  ;     "Select a plan that preserves the strongest invariant."
+  ;     "Introduce a collection module that any Rebis host can resolve.")
+  ;
+  ; Cost: git-intent performs four readings and a mediation; the second square
+  ; performs four more readings and a mediation; one final plan prompt runs.
+  (~ git-change-plan (judge task)
+    '(-> (git-intent ,judge ,task)
+         ([,judge]
+           (-> ,task
+               "Using the intent contract in INPUT, list the implementation stages in dependency order. Keep each stage independently reviewable.")
+           (-> ,task
+               "Using the intent contract in INPUT, define the tests, probes, or observations that can falsify every stage.")
+           (-> ,task
+               "Using the intent contract in INPUT, identify compatibility risks, migration edges, and the smallest safe fallback for each stage.")
+           (-> ,task
+               "Using the intent contract in INPUT, assign ownership boundaries and state what must not be changed while implementing the plan."))
+         "Produce the final change plan. Preserve the intent contract, order the slices, attach evidence to each step, and end with verification and rollback criteria."))
+
+  ; (git-commit-story judge task) — shape a durable commit narrative from a
+  ; change, not a list of staged filenames. The result is useful to a reviewer,
+  ; future maintainer, and recovery operator even when the original chat is
+  ; gone.
+  ;
+  ;   judge   mediator over the candidate narratives.
+  ;   task    the change to describe, read once per candidate.
+  ;
+  ; Example:
+  ;   (git-commit-story
+  ;     "Reject stories that mix unrelated intentions."
+  ;     "The run browser needs a chat entry point for a completed run.")
+  ;
+  ; Cost: four independent story readings, one mediator, one evidence-shaped
+  ; final answer. The macro does not choose a commit message or invoke git.
+  (~ git-commit-story (judge task)
+    '(std-with-evidence
+      (-> ([,judge]
+            (-> ,task
+                "State the one durable intention this commit should preserve. List what is deliberately outside its boundary.")
+            (-> ,task
+                "Describe the behavior before and after this change. Identify the invariant a reviewer should protect.")
+            (-> ,task
+                "Specify the evidence a reviewer can inspect: focused tests, parser checks, traces, screenshots, or other observable results.")
+            (-> ,task
+                "Design the smallest credible rollback or follow-up if the change is wrong. Do not hide uncertainty."))
+           "Write an atomic commit story with title, intention, invariant, affected surface, evidence, verification, and rollback. Keep one intention only.")))
+
+  ; (git-review-cycle judge worker critic repairer task) — run a proposal
+  ; through independent std-review paths while keeping the first attempt visible.
+  ; worker, critic, and repairer are one-argument macro names (or higher-order
+  ; expressions that accept the task). The judge is a square mediator.
+  ;
+  ;   judge      mediator over the untouched proposal and the repaired one.
+  ;   worker     a one-argument caller macro producing the proposal.
+  ;   critic     a one-argument caller macro finding what is wrong.
+  ;   repairer   a one-argument caller macro producing the revision.
+  ;   task       the subject, read by every stage.
+  ;
+  ; Example:
+  ;   (git-review-cycle
+  ;     "Prefer the repair that fixes the root cause with the least new risk."
+  ;     implement
+  ;     attack
+  ;     repair
+  ;     "Add a resolver for source-only collection modules.")
+  ;
+  ; Cost: the worker runs std-twice; one path flows worker → critic → repairer; the
+  ; other path independently attacks the task; one additional evidence branch
+  ; and one mediator preserve alternative readings; the final decision prompt
+  ; runs once. Keep workers deterministic enough for the evidence you need.
+  (~ git-review-cycle (judge worker critic repairer task)
+    '(std-with-evidence
+      (-> ([,judge]
+            (-> (,worker ,task)
+                (,critic ,task)
+                (,repairer ,task)
+                "State exactly what the repaired proposal changed, which criticism it answered, and which criticism remains open.")
+            (-> (,worker ,task)
+                "Review the proposal adversarially. Search for regressions, hidden coupling, missing tests, and an easier root-cause fix.")
+            (-> ,task
+                "Act as an independent verifier. Define the acceptance evidence and the failure evidence for this change without trusting its author."))
+           "Choose or synthesize a review decision. Return accepted changes, required repairs, evidence still missing, and a concrete next action.")))
+
+  ; (git-review-loop judge worker critic repairer stop value) — repeat a
+  ; std-review cycle until the caller's stop macro returns exactly 1. This is the
+  ; workflow form of bounded revision: no host std-loop or hidden state is needed.
+  ;
+  ;   judge      mediator used inside each cycle.
+  ;   worker     a one-argument caller macro producing each round's proposal.
+  ;   critic     a one-argument caller macro finding what is wrong.
+  ;   repairer   a one-argument caller macro producing the revision.
+  ;   stop       a one-argument 0/1 judge ending the loop. Prefer a host port
+  ;              (std/seam's std-gated-by) when the verdict is mechanical.
+  ;   value      the current proposal; fired in the stop check and in the cycle.
+  ;
+  ; Example:
+  ;   (git-review-loop
+  ;     "Choose the safer reviewed result."
+  ;     implement attack repair
+  ;     settled
+  ;     "Draft the migration plan.")
+  ;
+  ; stop is a one-argument 0/1 macro. The `%` gate is lazy, so an
+  ; accepted value never expands the recursive branch. The runtime's expansion
+  ; and model budgets remain the hard safety bound for a stop rule that never
+  ; settles.
+  ;
+  ; Cost: every non-terminal round runs stop and git-review-cycle; the cycle's
+  ; worker, critic, repairer, verifier, and judge costs are paid again.
+  (~ git-review-loop (judge worker critic repairer stop value)
+    '(% (,stop ,value)
+       ,value
+       (git-review-loop ,judge ,worker ,critic ,repairer ,stop
+         (git-review-cycle ,judge ,worker ,critic ,repairer ,value))))
+
+  ; (git-reconcile-lines judge ours theirs) — integrate two lines of work by
+  ; comparing their intentions and invariants, not by describing a merge tool.
+  ; `ours` and `theirs` are names for perspectives, not claims that one side is
+  ; automatically authoritative.
+  ;
+  ;   judge    mediator over the two integration readings.
+  ;   ours     one line of work.
+  ;   theirs   the other line of work.
+  ;
+  ; Example:
+  ;   (git-reconcile-lines
+  ;     "Preserve both valid intentions and expose every irreducible tradeoff."
+  ;     "The local line adds live run chat."
+  ;     "The incoming line adds finished-run transcript recovery.")
+  ;
+  ; Cost: each side is read std-twice through different questions, one cross-line
+  ; comparison runs, one mediator runs, and one integration decision prompt
+  ; runs. This intentionally keeps semantic disagreement visible.
+  (~ git-reconcile-lines (judge ours theirs)
+    '(std-with-evidence
+      (-> ([,judge]
+            (-> ,ours
+                "Extract this line's intended behavior, protected invariants, and evidence. Do not judge the other line yet.")
+            (-> ,theirs
+                "Extract this line's intended behavior, protected invariants, and evidence. Do not judge the first line yet.")
+            (-> ,ours
+                (<- ,theirs
+                    "Compare the two lines for overlapping edits, incompatible assumptions, and behavior that can be composed."))
+            (-> ,theirs
+                "Identify what would be lost if this line were simply replaced. Separate essential intent from incidental implementation."))
+           "Return an integration decision with preserve, combine, replace, or defer choices. State the shared invariants, unresolved tradeoffs, evidence required, and the owner of the next step.")))
+
+  ; (git-conflict-resolution judge resolver verifier conflict) — turn a
+  ; conflict into a semantic diagnosis, a candidate resolution, and a proof
+  ; obligation. resolver and verifier are one-argument macro names.
+  ;
+  ;   judge      mediator over the resolution and its verification.
+  ;   resolver   a one-argument caller macro producing the resolution.
+  ;   verifier   a one-argument caller macro checking it.
+  ;   conflict   the conflict, read by each stage.
+  ;
+  ; Example:
+  ;   (git-conflict-resolution
+  ;     "Prefer a resolution that preserves behavior and makes uncertainty explicit."
+  ;     resolve-conflict
+  ;     verify-resolution
+  ;     "Two implementations disagree about whether a missing module is fatal.")
+  ;
+  ; Cost: four independent conflict readings, one resolver→verifier chain, one
+  ; mediator, and one final decision prompt. The resolver is not trusted merely
+  ; because it produced an answer; the verifier receives its answer through an
+  ; arrow.
+  (~ git-conflict-resolution (judge resolver verifier conflict)
+    '(std-with-evidence
+      (-> ([,judge]
+            (-> ,conflict
+                "Classify the conflict: semantic behavior, interface contract, generated artifact, ordering, ownership, or operational state. Explain the classification.")
+            (-> ,conflict
+                "Reconstruct the invariant each side believes it protects. Cite the smallest evidence available for each belief.")
+            (-> (,resolver ,conflict)
+                (,verifier ,conflict)
+                "Verify the proposed resolution against both invariants. Name regressions, untested assumptions, and exact follow-up evidence.")
+            (-> ,conflict
+                "Describe the cost of choosing each possible resolution, including defer, revert, or preserve-both. Identify the least irreversible option."))
+           "Return the conflict diagnosis, selected resolution, rejected alternatives, invariant checks, evidence still missing, and a safe next action.")))
+
+  ; (git-history-inquiry judge question) — use repository history as evidence for
+  ; intent and precedent, without reducing history work to a command recipe.
+  ; The caller can pass a question, an incident, or a program that gathers
+  ; historical material through its own host integration.
+  ;
+  ;   judge      mediator over the historical readings.
+  ;   question   what the history is being asked, read once per reading.
+  ;
+  ; Example:
+  ;   (git-history-inquiry
+  ;     "Weigh precedent against present evidence; do not treat age as authority."
+  ;     "Why does this boundary reject unknown collection namespaces?")
+  ;
+  ; Cost: four independent inquiries, one mediator, and one conclusion prompt.
+  ; The output distinguishes observed precedent from inference and current
+  ; evidence, so it can guide a change without fossilizing old decisions.
+  (~ git-history-inquiry (judge question)
+    '(std-with-evidence
+      (-> ([,judge]
+            (-> ,question
+                "Reconstruct the historical intent relevant to this question. Separate direct evidence from a plausible story.")
+            (-> ,question
+                "Find precedent that supports the current behavior and precedent that limits or contradicts it. Explain the difference in context.")
+            (-> ,question
+                "Compare historical assumptions with the present architecture, users, and failure modes. Name what has changed.")
+            (-> ,question
+                "Run a counterfactual: if the historical decision were made today with current evidence, what would remain and what would change?"))
+           "Write a history-backed decision brief with observed evidence, competing interpretations, present-day relevance, confidence, and the smallest justified action.")))
+
+  ; (git-stack-integrity judge series) — std-review a sequence of changes as a
+  ; coherent argument. It catches a series whose individual changes look safe
+  ; but whose partial states break an invariant.
+  ;
+  ;   judge    mediator over the readings of the series.
+  ;   series   the sequence of changes, read once per reading.
+  ;
+  ; Example:
+  ;   (git-stack-integrity
+  ;     "Prefer a series that remains understandable and safe at every boundary."
+  ;     "A four-step series separates the parser, runtime, terminal, and visual changes.")
+  ;
+  ; Cost: five independent readings, one mediator, and one boundary report.
+  ; `series` can be a generated std-review program; it is not required to be a list
+  ; of commit identifiers.
+  (~ git-stack-integrity (judge series)
+    '(std-with-evidence
+      (-> ([,judge]
+            (-> ,series
+                "Explain the intention and invariant of each step in this series. Identify the evidence attached to each step.")
+            (-> ,series
+                "Inspect every partial state between steps. Find a point where a user, deploy, or reviewer could observe a broken contract.")
+            (-> ,series
+                "Check dependency order and reversibility. State which step can be reverted independently and which cannot.")
+            (-> ,series
+                "Search for duplicated intention, hidden coupling, and changes that should be split or combined.")
+            (-> ,series
+                "Design a reviewer walkthrough that can verify the series without reconstructing the author's private context."))
+           "Return a series verdict with step boundaries, partial-state hazards, evidence gaps, reversibility, and the smallest restructuring needed.")))
+
+  ; (git-release-gate gate candidate) — make release readiness a lazy decision.
+  ; `gate` must be a one-argument macro that answers exactly 0 or 1. Only the
+  ; accepted or rejected continuation expands, so a rejected candidate does not
+  ; accidentally run the shipping path.
+  ;
+  ;   gate        a one-argument 0/1 judge over the candidate. Prefer a host port
+  ;          (std/seam's std-gated-by) — a model asked whether its own release
+  ;          is ready will usually say yes.
+  ;   candidate   the release under consideration.
+  ;
+  ; Example:
+  ;   (~ ready (candidate)
+  ;     '(-> ,candidate "Is the candidate ready? Answer exactly 0 or 1."))
+  ;   (git-release-gate ready "The reviewed change candidate")
+  ;
+  ; Cost: the gate runs once, then exactly one continuation runs, followed by
+  ; the evidence contract supplied by std/shape. The candidate may be repeated
+  ; by the gate and selected branch, so use a stable source expression.
+  (~ git-release-gate (gate candidate)
+    '(std-with-evidence
+      (% (,gate ,candidate)
+        (-> ,candidate
+            "The release gate accepted this candidate. State the release decision, remaining monitored risks, owner, and rollback trigger.")
+        (-> ,candidate
+            "The release gate rejected this candidate. State the blocking evidence, smallest repair, and the condition that would reopen the gate."))))
+
+  ; (git-recovery-plan judge incident) — treat recovery as a decision under
+  ; uncertainty. The result separates containment, diagnosis, rollback,
+  ; forward-fix, communication, and follow-up rather than assuming revert is
+  ; always safest.
+  ;
+  ;   judge      mediator over the candidate recovery paths.
+  ;   incident   the incident, read once per path.
+  ;
+  ; Example:
+  ;   (git-recovery-plan
+  ;     "Choose the least irreversible recovery that restores the invariant."
+  ;     "A release introduced intermittent failures after a repository split.")
+  ;
+  ; Cost: five independent readings, one mediator, and one recovery brief. No
+  ; branch is allowed to silently collapse diagnosis into a proposed command.
+  (~ git-recovery-plan (judge incident)
+    '(std-with-evidence
+      (-> ([,judge]
+            (-> ,incident
+                "Reconstruct the observable timeline. Mark facts, estimates, unknowns, and the first trustworthy signal.")
+            (-> ,incident
+                "Define the invariant currently broken and the smallest containment action that protects users while preserving evidence.")
+            (-> ,incident
+                "Compare rollback, forward-fix, feature isolation, and defer. State prerequisites and irreversible consequences for each.")
+            (-> ,incident
+                "Design verification probes for containment and recovery. Each probe must distinguish success from a misleading quiet failure.")
+            (-> ,incident
+                "Plan communication and ownership: who decides, who observes, who is informed, and what evidence closes the incident."))
+           "Return a recovery plan with immediate containment, diagnosis, decision criteria, selected path, verification, communication, rollback trigger, and follow-up learning.")))
+
+  ; (git-retrospective judge outcome) — turn an integrated result into reusable
+  ; workflow knowledge. This is deliberately evidence-first: it does not ask
+  ; for a mood report or blame assignment.
+  ;
+  ;   judge     mediator over the retrospective readings.
+  ;   outcome   the integrated result, read once per reading.
+  ;
+  ; Example:
+  ;   (git-retrospective
+  ;     "Keep lessons that change future decisions and discard unsupported blame."
+  ;     "The module shipped after two review rounds and one delayed rollback test.")
+  ;
+  ; Cost: four independent readings, one mediator, and one action-oriented
+  ; retrospective prompt.
+  (~ git-retrospective (judge outcome)
+    '(std-with-evidence
+      (-> ([,judge]
+            (-> ,outcome
+                "Compare intended outcome with observed outcome. Identify the largest meaningful divergence and its evidence.")
+            (-> ,outcome
+                "Find which review, test, or communication signal was predictive. Find which signal was noisy or missing.")
+            (-> ,outcome
+                "Separate process constraints from individual choices. Name the smallest workflow change that would alter the result next time.")
+            (-> ,outcome
+                "Design one reusable checklist, macro composition, test, or evidence convention derived from this outcome."))
+           "Write a concise retrospective with evidence, divergence, predictive signals, one workflow change, an owner, and a way to measure whether the lesson transfers.")))
+)

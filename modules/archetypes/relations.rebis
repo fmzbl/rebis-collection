@@ -1,0 +1,153 @@
+; archetypes/relations — deliberate work with an inner or outer counterpart.
+;
+; The “other” is represented as a change of viewpoint. Projection-check asks
+; whether a quality attributed to the counterpart is also active in the
+; source. The module is useful for stakeholder std-review, self-critique, and
+; adversarial design without pretending that one side is the whole truth.
+(
+  (# archetypes/core)
+  (# std/canon)
+  (# std/debate)
+  (# std/dialectic)
+  (# std/reflexion)
+  (# std/shape)
+
+  ; (arch-counterpart lens work) — construct the strongest useful account from
+  ; the position treated as other, then ground it in evidence.
+  ;
+  ;   lens   mediator over the readings below. A symbol mediates
+  ;          deterministically and fires no model; a prompt costs one call.
+  ;   work   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-counterpart
+  ;     "Give the strongest useful account from the affected operator's view."
+  ;     "The product team wants to remove the manual approval step.")
+  ;
+  ; Cost: work is read through three branches.
+  (~ arch-counterpart (lens work)
+    '(-> ([,lens]
+          (-> ,work
+              "State the strongest useful account from the position this work treats as other.")
+          (-> ,work
+              "Name what that position values, fears, or needs protected.")
+          (-> ,work
+              "Cite the evidence in the source that supports or limits that account."))
+         "Do not caricature the counterpart; preserve its strongest constraint."))
+
+  ; (arch-projection-check lens work) — a one-argument lens macro can inspect a
+  ; quality assigned to the other and test whether it is also active in work.
+  ;
+  ;   lens   a one-argument caller macro, applied to the material.
+  ;   work   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-projection-check operator-view "The operator is resisting automation.")
+  ;
+  ; Cost: lens runs once, followed by a source-side comparison prompt.
+  (~ arch-projection-check (lens work)
+    '(-> (,lens ,work)
+         (-> ,work
+             "Which quality assigned to the other may also be active in the source? Cite evidence before drawing a conclusion.")
+         "Return the shared quality, the evidence for it, and the difference that remains."))
+
+  ; (arch-dialogue speaker arch-counterpart reconciler work) — put two one-argument
+  ; readings and a projection check under one mediator.
+  ;
+  ;   speaker       a one-argument caller macro, applied to the material.
+  ;   counterpart   forwarded unchanged to arch-counterpart.
+  ;   reconciler    mediator over the readings below. A symbol mediates
+  ;                 deterministically and fires no model; a prompt costs one call.
+  ;   work          forwarded unchanged to arch-counterpart.
+  ;
+  ; Example:
+  ;   (arch-dialogue
+  ;     product-view
+  ;     operator-view
+  ;     "Reconcile product speed with operator safety."
+  ;     "Remove the manual approval step.")
+  ;
+  ; Cost: both viewpoints and the projection check run before mediation.
+  (~ arch-dialogue (speaker counterpart reconciler work)
+    '(-> ([,reconciler]
+          (-> (,speaker ,work)
+              "State the speaker's concrete aim and constraint.")
+          (arch-counterpart ,counterpart ,work)
+          (arch-projection-check ,counterpart ,work))
+         "Return a relation in which both sides can recognize their constraint."))
+
+  ; (arch-reciprocal worker work) — send a worker's reading outward and back into
+  ; its source, asking what must change on both sides.
+  ;
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   work     the material under examination; read once per branch it
+  ;            appears in.
+  ;
+  ; Example:
+  ;   (arch-reciprocal critique "The proposal treats support as an afterthought.")
+  ;
+  ; Cost: worker fires std-twice in opposite directions.
+  (~ arch-reciprocal (worker work)
+    '(-> (,worker ,work)
+         (<- ,work
+             (,worker ,work))
+         "State what the source must change and what the counterpart must acknowledge."))
+
+  ; (arch-relation-work speaker arch-counterpart reconciler worker task) — create a
+  ; worker result, stage a counterpart dialogue around it, and return the
+  ; result to the worker for a negotiated revision.
+  ;
+  ;   speaker       a one-argument caller macro, applied to the material.
+  ;   counterpart   forwarded unchanged to arch-counterpart.
+  ;   reconciler    mediator over the readings below. A symbol mediates
+  ;                 deterministically and fires no model; a prompt costs one call.
+  ;   worker        a one-argument caller macro, applied to the material.
+  ;   task          forwarded unchanged to arch-counterpart.
+  ;
+  ; Example:
+  ;   (arch-relation-work
+  ;     product-view
+  ;     operator-view
+  ;     "Find a plan both roles can operate."
+  ;     revise
+  ;     "Automate the deployment approval process.")
+  ;
+  ; Cost: worker is used for the proposal and revision; the arch-dialogue has
+  ; three mediated branches.
+  (~ arch-relation-work (speaker counterpart reconciler worker task)
+    '(-> ([,reconciler]
+           (-> (,speaker (,worker ,task))
+               "State the proposal's benefit and its constraint.")
+           (arch-counterpart ,counterpart (,worker ,task))
+           (arch-projection-check ,counterpart (,worker ,task)))
+         (,worker ,task)
+         "Revise the proposal so the counterpart's strongest constraint is visible, testable, and assigned to an owner."))
+
+  ; (arch-relation-cycle speaker arch-counterpart worker stop value) — repeat
+  ; arch-reciprocal revision until the caller's stop macro accepts the relation.
+  ;
+  ;   speaker       forwarded unchanged to arch-relation-cycle.
+  ;   counterpart   forwarded unchanged to arch-relation-cycle.
+  ;   worker        a one-argument caller macro, applied to the material.
+  ;   stop          a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;                 ordinary question into that protocol; std/seam's std-gated-by
+  ;                 makes the verdict mechanical and free.
+  ;   value         the material under examination; read once per branch it
+  ;                 appears in.
+  ;
+  ; Example:
+  ;   (arch-relation-cycle product-view operator-view revise std-binary "Draft the change.")
+  ;
+  ; Cost: recursive and budget-bounded; each round performs both viewpoints.
+  (~ arch-relation-cycle (speaker counterpart worker stop value)
+    '(% (,stop ,value)
+      ,value
+      (arch-relation-cycle ,speaker ,counterpart ,worker ,stop
+        (-> (arch-dialogue ,speaker ,counterpart
+               "Reconcile the two constraints without flattening either."
+               (,worker ,value))
+            (,worker ,value)
+            "Make the negotiated change concrete and observable."))))
+)

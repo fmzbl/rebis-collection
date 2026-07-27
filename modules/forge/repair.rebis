@@ -1,0 +1,172 @@
+; forge/repair — the coding repair loop, as a program rather than a habit.
+;
+; std/spiral supplies the restart topology and, being a structural module,
+; refuses to phrase anything: it asks the caller for a frame, a distiller, a
+; worker, and a gate. This module is the other half — the phrasings that make
+; that ladder a repair loop, and the wiring that hands them over.
+;
+; The discipline the family encodes is the one that survives contact with a
+; real bug: reproduce before diagnosing, diagnose before fixing, fix the cause
+; rather than the symptom, and let something mechanical decide whether it
+; worked. A model asked whether its own patch is good will usually say yes;
+; forge-mechanical-verdict never asks it.
+;
+; Every argument is syntax. A task can be a prompt, an arrow, a square, a port,
+; or another macro call.
+(
+  (# std/spiral)
+  (# std/seam)
+  (# std/shape)
+
+  ; (forge-reproduce task) — establish a failing observation before anything is
+  ; allowed to be called a cause.
+  ;
+  ;   task   the report to reduce to a reproduction. Any syntax — a prompt, an
+  ;          arrow, a square, a port, or another macro call.
+  ;
+  ; An unreproduced bug is a rumour, and a repair loop started on a rumour
+  ; cannot terminate: nothing can tell it it is done.
+  ;
+  ; Example:
+  ;   (forge-reproduce "Cancelling a run leaves the child process alive.")
+  ;
+  ; Cost: one call.
+  (~ forge-reproduce (task)
+    '(-> ,task
+         "State the smallest sequence of steps that produces this failure, the exact observation that counts as the failure, and the observation that would count as its absence. If the failure cannot be reproduced from the evidence available, say so plainly and stop rather than guessing at a cause."))
+
+  ; (forge-hypotheses judge task) — three independent accounts of the cause,
+  ; kept apart until a mediator sees all of them.
+  ;
+  ;   judge   mediator over the three accounts. A symbol keeps the selection
+  ;           promptless; a prompt costs one extra call.
+  ;   task    the subject, read once by each account.
+  ;
+  ; Branches are independent by construction, so the second account is not a
+  ; continuation of the first — which is exactly the failure mode of a single
+  ; long diagnosis.
+  ;
+  ; Example:
+  ;   (forge-hypotheses cheapest-discriminating-test reproduction)
+  ;
+  ; Cost: three readings and one mediation.
+  (~ forge-hypotheses (judge task)
+    '([,judge]
+      (-> ,task
+          "Give the most likely cause of this failure, the mechanism by which it produces exactly this observation, and the single cheapest check that would discriminate it from any other cause.")
+      (-> ,task
+          "Give a cause that a first reading would miss — an ordering, lifetime, boundary, or concurrency effect. State the mechanism and its cheapest discriminating check.")
+      (-> ,task
+          "Argue that the reported failure is not where it appears to be: that the observation is a symptom of a defect elsewhere, or that the expectation itself is wrong. State the check that would settle it.")))
+
+  ; (forge-root-cause judge task) — reproduce, then diagnose against that
+  ; reproduction.
+  ;
+  ;   judge   mediator handed on to forge-hypotheses.
+  ;   task    the subject. Read once by the reproduction and once by each of the
+  ;           three accounts.
+  ;
+  ; The reproduction flows into the hypotheses as INPUT, so the accounts are
+  ; constrained by the observation rather than by the prose of the original
+  ; report.
+  ;
+  ; Cost: forge-reproduce once, then three readings and a mediation.
+  (~ forge-root-cause (judge task)
+    '(-> (forge-reproduce ,task) (forge-hypotheses ,judge ,task)))
+
+  ; (forge-attempt budget) — the DIRECTIVE FRAME for a spiral rung.
+  ;
+  ;   budget   the rung's allowance, as text. Interpolated by `$`, never fired.
+  ;
+  ; std/spiral calls this with the rung's budget and nothing else; the distilled
+  ; verdict of the previous attempt arrives separately, as INPUT, because a
+  ; verdict is a computed value and `$` carries only inert text.
+  ;
+  ; Pass this as std-spiral's `frame` argument.
+  ;
+  ; Cost: nothing. `$` assembles the directive during expansion.
+  (~ forge-attempt (budget)
+    ($ "You have a budget of " budget
+       " — one mark is one step. Any INPUT above is the verdict of an earlier attempt that was discarded; its reasoning is gone and only that verdict survived. Do not repeat what it rules out. Make the smallest change that addresses the cause, then verify it."))
+
+  ; (forge-verdict attempt) — the DISTILLER: what crosses a banishment.
+  ;
+  ;   attempt   the rejected working whose findings must survive. Runs first;
+  ;             the compression prompt receives its answer as INPUT.
+  ;
+  ; The whole point of a restart is that the context does not survive, so this
+  ; must compress an attempt into something a fresh worker can use without
+  ; reconstructing the reasoning that produced it.
+  ;
+  ; Pass this as std-spiral's `distil` argument.
+  ;
+  ; Cost: one call per banished attempt.
+  (~ forge-verdict (attempt)
+    '(-> ,attempt
+         "In at most five lines: what this attempt established as true, what it ruled out, and what the next attempt must not repeat. Write no narrative and keep no reasoning — only findings a stranger could act on."))
+
+  ; (forge-mechanical-verdict work shipped banished) — the gate that cannot be
+  ; talked into a yes.
+  ;
+  ;   work       the working whose outcome is being judged. Fires once.
+  ;   shipped    complete expression run when the host delivers 1.
+  ;   banished   complete expression run when the host delivers 0.
+  ;
+  ; The working runs, then the HOST answers with an exact 0 or 1 through
+  ; std/seam's port: it watched whether a file changed and whether the tests
+  ; passed, so the decision costs no model call and no answer can argue with it.
+  ;
+  ; Example:
+  ;   (forge-mechanical-verdict (repair task) (forge-commit task) (forge-log task))
+  ;
+  ; Cost: work once; the decision is free; exactly one continuation expands.
+  (~ forge-mechanical-verdict (work shipped banished)
+    '(std-gated-by ,work ,shipped ,banished))
+
+  ; (forge-repair work gate cause seed grown) — the assembled loop: a
+  ; Fibonacci ladder of banished attempts, each drawn under forge's directive
+  ; frame, each failure compressed by forge-verdict before the next rung, with
+  ; the twin drawing the working in the opposite orientation.
+  ;
+  ;   work    a one-argument worker receiving the framed directive.
+  ;   gate    a one-argument 0/1 judge over each attempt. Prefer a host port
+  ;           (see forge-mechanical-verdict) over a model asked to grade its own
+  ;           patch.
+  ;   cause   the opening crossing — typically a forge-root-cause result, which
+  ;           is what the first rung is given instead of a prior verdict.
+  ;   seed    the FIRST rung's allowance, as text.
+  ;   grown   the SECOND rung's allowance. Together with `seed` these are the
+  ;           two Fibonacci seeds, so the schedule stays a program's decision.
+  ;
+  ; Example:
+  ;   (forge-repair repair accepted
+  ;     (forge-root-cause cheapest-check "Cancelling leaves the child alive.")
+  ;     eight thirteen)
+  ;
+  ; Cost: per rung, the attempt is spliced twice (gate and continuation) and
+  ; one verdict is distilled on rejection. An accepted first rung costs one
+  ; ladder step; the runtime's expansion and model-call budgets are the hard
+  ; backstop, since the ladder has no base case of its own.
+  (~ forge-repair (work gate cause seed grown)
+    '(std-spiral forge-attempt forge-verdict ,work ,gate ,cause ,seed ,grown))
+
+  ; (forge-postmortem judge outcome) — turn a finished repair into something
+  ; that changes the next one.
+  ;
+  ;   judge     mediator over the three retrospective readings.
+  ;   outcome   the finished repair, read once by each reading.
+  ;
+  ; Deliberately evidence-first, and deliberately aimed at the loop rather than
+  ; only the code: it asks what the repair process itself got wrong.
+  ;
+  ; Cost: three readings, one mediation, one evidence-shaped answer.
+  (~ forge-postmortem (judge outcome)
+    '(std-with-evidence
+      (-> ([,judge]
+            (-> ,outcome
+                "Which attempt actually found the cause, and what did the attempts before it spend their budget on? Name the signal that would have reached the answer sooner.")
+            (-> ,outcome
+                "Did the gate accept for the right reason? Identify any way this repair could pass its check while leaving the cause in place.")
+            (-> ,outcome
+                "What in the codebase made this failure possible to introduce and hard to observe? Propose the smallest change that removes that class."))
+           "Write a repair postmortem: the cause, the evidence that settled it, the wasted budget and why, one change to the code, and one change to how the next repair is attempted."))))

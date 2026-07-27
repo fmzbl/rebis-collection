@@ -1,0 +1,164 @@
+; science/method — claims that have to survive something.
+;
+; The family exists because a model will produce a confident account of almost
+; anything, and confidence is the one signal that carries no information. What
+; carries information is a claim that forbids an observation. These macros are
+; built around that asymmetry: every protocol here ends by asking what would
+; have to be true for the claim to be WRONG, and what it would cost to look.
+;
+; This is not a claim that a language model can run an experiment. It cannot.
+; What it can do is state a prediction precisely enough that a host, a test, or
+; a person can check it — and std/seam is where that check comes back in.
+(
+  (# std/sieve)
+  (# std/seam)
+  (# std/shape)
+
+  ; (sci-hypotheses judge observation) — competing explanations, each carrying
+  ; its own prediction.
+  ;
+  ;   judge         mediator over the three explanations. A symbol keeps the
+  ;                 selection promptless.
+  ;   observation   what needs explaining. Read once by each branch.
+  ;
+  ; Independent branches keep the second explanation from becoming a footnote to
+  ; the first.
+  ;
+  ; Example:
+  ;   (sci-hypotheses most-discriminating
+  ;     "Solve times are bimodal: most runs finish fast, a tail never converges.")
+  ;
+  ; Cost: three readings and one mediation.
+  (~ sci-hypotheses (judge observation)
+    '([,judge]
+      (-> ,observation
+          "State the most plausible explanation of this observation, the mechanism that produces it, and one specific measurement it predicts that a rival explanation would not.")
+      (-> ,observation
+          "State an explanation that assumes the measurement itself is misleading — selection, instrumentation, survivorship, or a definition doing hidden work. Give the check that would expose it.")
+      (-> ,observation
+          "State the dullest explanation: coincidence, a known cause already documented, or an artefact of sample size. Give the check that would rule it out.")))
+
+  ; (sci-prediction hypothesis) — force a claim to forbid something.
+  ;
+  ;   hypothesis   the claim to sharpen. Runs first; the prediction prompt
+  ;                receives its answer as INPUT.
+  ;
+  ; A claim that forbids nothing cannot be tested and should be spent no budget
+  ; on — so this macro is also a filter, not only a formatter.
+  ;
+  ; Cost: one call.
+  (~ sci-prediction (hypothesis)
+    '(-> ,hypothesis
+         "Write the prediction this claim makes, as an observation that could be made and could come out either way. Then write the observation that would falsify it. If the claim forbids no observation, say so explicitly and recommend discarding it."))
+
+  ; (sci-experiment judge hypothesis) — design the cheapest discriminating test,
+  ; not the most thorough one.
+  ;
+  ;   judge        mediator over the three designs.
+  ;   hypothesis   the claim under test. Read once by each design.
+  ;
+  ; Cost of evidence is part of the evidence.
+  ;
+  ; Example:
+  ;   (sci-experiment cheapest-decisive (sci-prediction ladder-claim))
+  ;
+  ; Cost: three designs and one mediation.
+  (~ sci-experiment (judge hypothesis)
+    '([,judge]
+      (-> ,hypothesis
+          "Design the cheapest test that would distinguish this claim from its closest rival. State the sample, the measurement, the decision rule chosen in advance, and the cost.")
+      (-> ,hypothesis
+          "Design the test that would most convincingly refute the claim if it is false. State what a defender would say about a negative result, and close that door in advance.")
+      (-> ,hypothesis
+          "Identify the cheapest evidence that already exists — logs, prior runs, published results — and what it can and cannot settle without new work.")))
+
+  ; (sci-falsify claim) — the honest inversion: argue the negation at full
+  ; strength before the claim is allowed to stand.
+  ;
+  ;   claim   the claim to argue against. Runs first; the falsification prompt
+  ;           receives its answer as INPUT.
+  ;
+  ; std/canon's std-steelman supplies the canonical phrasing for the general
+  ; case; this one keeps the result pinned to evidence rather than to rhetoric.
+  ;
+  ; Cost: one call.
+  (~ sci-falsify (claim)
+    '(-> ,claim
+         "Argue the strongest case that this claim is false, using only evidence and mechanism, not tone. End with the single observation that would most efficiently settle the disagreement."))
+
+  ; (sci-tested forbids survives claim body) — hold a claim to both bars before
+  ; it may be used: it must forbid an observation, and its negation must have
+  ; been argued.
+  ;
+  ;   forbids    a one-argument 0/1 judge asking whether the claim forbids any
+  ;              observation (std/canon's std-binary wraps an ordinary question
+  ;              into that protocol). Always runs.
+  ;   survives   a one-argument 0/1 judge asking whether the claim survived its
+  ;              own steelman. Never fires if `forbids` rejects.
+  ;   claim      the subject, read by each judge that runs.
+  ;   body       complete expression run only when both judges accept; otherwise
+  ;              the macro is silent and yields `nothing`.
+  ;
+  ; The sieve is lazy, so a claim that forbids nothing costs one judge call and
+  ; the steelman is never paid for.
+  ;
+  ; Cost: one judge call on rejection, two otherwise, plus `body` when selected.
+  ;
+  ; Example:
+  ;   (sci-tested forbids-an-observation survives-its-steelman claim (publish claim))
+  (~ sci-tested (forbids survives claim body)
+    '(std-when-both ,forbids ,survives ,claim ,body))
+
+  ; (sci-adjudicate claim upheld overturned) — let the WORLD answer.
+  ;
+  ;   claim        the claim and its test design. Fires once; its answer is what
+  ;                the host acts on.
+  ;   upheld       complete expression run when the host delivers 1.
+  ;   overturned   complete expression run when the host delivers 0.
+  ;
+  ; The claim and its test design go out; the host runs the test and returns an
+  ; exact 0 or 1 through the seam port. No model grades its own hypothesis, and
+  ; the verdict costs no model call.
+  ;
+  ; This is the only macro in the family that can actually settle anything. The
+  ; rest prepare a question precisely enough for it to be worth asking.
+  ;
+  ; Example:
+  ;   (sci-adjudicate (sci-experiment cheapest-decisive ladder-claim)
+  ;     (sci-record ladder-claim)
+  ;     (sci-hypotheses most-discriminating ladder-claim))
+  ;
+  ; Cost: the design fires once; the verdict is free; one continuation expands.
+  (~ sci-adjudicate (claim upheld overturned)
+    '(std-gated-by ,claim ,upheld ,overturned))
+
+  ; (sci-replicate judge claim) — independent re-derivation.
+  ;
+  ;   judge   mediator over the two derivations. Give it a phrasing that treats
+  ;           agreement-by-shared-assumption as no agreement at all.
+  ;   claim   the result to re-derive, read once by each route.
+  ;
+  ; Two workers reach the result by routes chosen to share as little as
+  ; possible — which is what makes their agreement evidence rather than an echo.
+  ;
+  ; Cost: two derivations and one mediation.
+  (~ sci-replicate (judge claim)
+    '([,judge]
+      (-> ,claim
+          "Derive this result from first principles, stating each assumption as you use it. Do not consult the original argument's structure.")
+      (-> ,claim
+          "Reach this result by a deliberately different route — a different model, dataset, limiting case, or unit analysis. List the assumptions you did NOT share with a first-principles derivation.")))
+
+  ; (sci-record finding) — the durable form.
+  ;
+  ;   finding   the result to fix in place. Runs first; the recording prompt
+  ;             receives its answer as INPUT.
+  ;
+  ; A finding that cannot be found again is not a finding; this fixes what was
+  ; measured, under what conditions, and what would overturn it.
+  ;
+  ; Cost: one evidence-shaped call.
+  (~ sci-record (finding)
+    '(std-with-evidence
+      (-> ,finding
+          "Record this result so it can be checked later: the question, the measurement and its conditions, the decision rule set in advance, the outcome, the confidence and what limits it, and the observation that would overturn it."))))

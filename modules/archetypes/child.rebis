@@ -1,0 +1,157 @@
+; archetypes/child — protect a small beginning long enough to test it.
+;
+; The child motif is used as a protocol for curiosity, renewal, and
+; unfinished potential. It does not mean innocence, regression, or a claim
+; about a person. The useful move is to shrink a large task into a std-reversible
+; experiment and then turn the result into capacity.
+(
+  (# archetypes/core)
+  (# std/canon)
+  (# std/dialectic)
+  (# std/evolve)
+  (# std/loops)
+  (# std/search)
+  (# std/shape)
+  (# std/spread)
+
+  ; (arch-child-seed lens task) — find the smallest viable possibility and the
+  ; condition that would let it grow.
+  ;
+  ;   lens   mediator over the readings below. A symbol mediates
+  ;          deterministically and fires no model; a prompt costs one call.
+  ;   task   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-child-seed
+  ;     "Find the smallest reversible beginning."
+  ;     "Replace the batch exporter with a streaming exporter.")
+  ;
+  ; Cost: task is considered in two independent branches.
+  (~ arch-child-seed (lens task)
+    '(-> ([,lens]
+          (-> ,task
+              "Locate the smallest living possibility, curiosity, or new beginning in this task.")
+          (-> ,task
+              "State the smallest experiment that could disprove or strengthen that possibility."))
+         "Keep the seed concrete enough to run without committing to the whole future."))
+
+  ; (arch-child-experiment worker lens task) — turn a seed into an experiment,
+  ; inspect what the experiment enables, and name its learning.
+  ;
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   lens     forwarded unchanged to arch-child-seed.
+  ;   task     forwarded unchanged to arch-child-seed.
+  ;
+  ; Example:
+  ;   (arch-child-experiment
+  ;     experiment
+  ;     "Keep the experiment reversible."
+  ;     "Introduce a read-only streaming endpoint.")
+  ;
+  ; Cost: arch-child-seed is repeated for the worker and the observation pass.
+  (~ arch-child-experiment (worker lens task)
+    '(-> (arch-child-seed ,lens ,task)
+         (,worker (arch-child-seed ,lens ,task))
+         (-> (arch-child-seed ,lens ,task)
+             "What did the experiment make possible, and what did it rule out?")
+         "State the observed result, the newly available capacity, and the next small test."))
+
+  ; (arch-child-to-capacity judge worker lens task) — take the experiment path
+  ; only when the seed passes the caller's judge; otherwise return to the
+  ; ordinary task without pretending the seed failed forever.
+  ;
+  ;   judge    a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;            ordinary question into that protocol; std/seam's std-gated-by
+  ;            makes the verdict mechanical and free.
+  ;   worker   forwarded unchanged to arch-child-experiment.
+  ;   lens     forwarded unchanged to arch-child-seed.
+  ;   task     forwarded unchanged to arch-child-seed.
+  ;
+  ; Example:
+  ;   (arch-child-to-capacity
+  ;     std-binary
+  ;     experiment
+  ;     "Judge whether this beginning is safe to try."
+  ;     "Prototype the new parser.")
+  ;
+  ; Cost: the conditional is lazy; only the selected branch expands.
+  (~ arch-child-to-capacity (judge worker lens task)
+    '(% (,judge (arch-child-seed ,lens ,task))
+      (arch-child-experiment ,worker ,lens ,task)
+      (-> ,task
+          "Keep the current task intact and identify a smaller question before experimenting.")))
+
+  ; (arch-child-lab lens worker judge task) — run the experiment through two
+  ; complementary readings, then lazily choose a capacity-building report or
+  ; a conservative next question.
+  ;
+  ;   lens     forwarded unchanged to arch-child-experiment.
+  ;   worker   forwarded unchanged to arch-child-experiment.
+  ;   judge    forwarded unchanged to std-try-else.
+  ;   task     forwarded unchanged to arch-child-experiment.
+  ;
+  ; Example:
+  ;   (arch-child-lab
+  ;     "Mediate curiosity and operational safety."
+  ;     experiment
+  ;     std-binary
+  ;     "Test a new cache key in one staging tenant.")
+  ;
+  ; Cost: the primary branch runs the experiment std-twice through its two
+  ; readings; fallback is paid only when judge rejects it.
+  (~ arch-child-lab (lens worker judge task)
+    '(std-try-else ,judge
+       (-> (arch-child-experiment ,worker ,lens ,task)
+           "Turn the learning into one reusable capability and one bounded follow-up.")
+       (-> (arch-child-seed ,lens ,task)
+           "Keep the seed alive as a question; name the smallest observation that would justify another experiment.")))
+
+  ; (arch-child-growth worker stop value) — expose the standard judged std-loop as a
+  ; child vocabulary. worker and stop are one-argument macro symbols.
+  ;
+  ;   worker   loop machinery — see the cost note; the value is spliced into
+  ;            both the stop check and the continuation.
+  ;   stop     loop machinery — see the cost note; the value is spliced into
+  ;            both the stop check and the continuation.
+  ;   value    loop machinery — see the cost note; the value is spliced into
+  ;            both the stop check and the continuation.
+  ;
+  ; Example:
+  ;   (arch-child-growth refine std-binary "Draft a migration experiment.")
+  ;
+  ; Cost: each round reuses the worker in the std-loop's stop and continuation;
+  ; runtime budgets bound an over-optimistic stop rule.
+  (~ arch-child-growth (worker stop value)
+    '(std-loop ,value ,worker ,stop))
+
+  ; (arch-child-capacity lens worker judge verifier task) — use the seed,
+  ; experiment, and a final verifier to turn novelty into an accountable
+  ; next action.
+  ;
+  ;   lens       forwarded unchanged to arch-child-experiment.
+  ;   worker     forwarded unchanged to arch-child-experiment.
+  ;   judge      a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;              ordinary question into that protocol; std/seam's std-gated-by
+  ;              makes the verdict mechanical and free.
+  ;   verifier   a one-argument caller macro, applied to the material.
+  ;   task       forwarded unchanged to arch-child-experiment.
+  ;
+  ; Example:
+  ;   (arch-child-capacity
+  ;     "Find the new capability without overcommitting."
+  ;     experiment
+  ;     std-binary
+  ;     std-binary
+  ;     "Try the new import path behind a feature flag.")
+  ;
+  ; Cost: the experiment appears in the judge and verifier paths; this is an
+  ; explicit std-audit for high-consequence experiments.
+  (~ arch-child-capacity (lens worker judge verifier task)
+    '(% (,judge (arch-child-experiment ,worker ,lens ,task))
+      (-> (arch-child-experiment ,worker ,lens ,task)
+          (,verifier
+            "Does this experiment produce a concrete, reversible capacity?"))
+      (-> (arch-child-seed ,lens ,task)
+          "Return the smaller experiment and the evidence still needed before expanding it.")))
+)

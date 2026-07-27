@@ -1,0 +1,138 @@
+; archetypes/persona — work on interfaces, roles, and audience adaptation.
+;
+; A persona is modeled as a useful public interface, not as the whole system
+; behind it. The audience parameter is a one-argument macro that renders the
+; audience's reading. The lens is normally a prompt or deterministic symbol
+; used to mediate the readings.
+(
+  (# archetypes/core)
+  (# archetypes/shadow)
+  (# std/canon)
+  (# std/dialectic)
+  (# std/search)
+  (# std/shape)
+
+  ; (arch-role-reading lens audience work) — compare the audience-facing role
+  ; with direct evidence from the work.
+  ;
+  ;   lens       mediator over the readings below. A symbol mediates
+  ;              deterministically and fires no model; a prompt costs one call.
+  ;   audience   a one-argument caller macro, applied to the material.
+  ;   work       the material under examination; read once per branch it
+  ;              appears in.
+  ;
+  ; Example:
+  ;   (arch-role-reading
+  ;     "Name the role without confusing it with the whole."
+  ;     audience-view
+  ;     "The status report says the migration is green.")
+  ;
+  ; Cost: work is rendered through audience-view and read directly.
+  (~ arch-role-reading (lens audience work)
+    '(-> ([,lens]
+          (-> (,audience ,work)
+              "Describe the role, voice, or interface the work presents to its audience.")
+          (-> ,work
+              "List the facts or constraints that remain behind the public interface."))
+         "Separate useful adaptation from concealment, overclaiming, or missing context."))
+
+  ; (arch-mask-check lens audience work) — perform a role reading, a direct
+  ; reading, and a final check for what the role makes easy or hard to see.
+  ;
+  ;   lens       mediator over the readings below. A symbol mediates
+  ;              deterministically and fires no model; a prompt costs one call.
+  ;   audience   forwarded unchanged to arch-role-reading.
+  ;   work       forwarded unchanged to arch-role-reading.
+  ;
+  ; Example:
+  ;   (arch-mask-check
+  ;     "Compare public presentation with direct evidence."
+  ;     audience-view
+  ;     "The incident report presents the outage as fully resolved.")
+  ;
+  ; Cost: arch-role-reading already uses two branches; the direct comparison adds
+  ; another pass over the work.
+  (~ arch-mask-check (lens audience work)
+    '(-> (arch-role-reading ,lens ,audience ,work)
+         ([,lens]
+           (-> ,work
+               "What does the public form make easy to see?")
+           (-> ,work
+               "What does the public form make difficult to see or question?"))
+         "Keep the interface useful while restoring the missing qualification."))
+
+  ; (arch-persona-revision lens audience worker task) — revise an attempted
+  ; answer for an audience without letting the role claim completeness.
+  ;
+  ;   lens       forwarded unchanged to arch-role-reading.
+  ;   audience   forwarded unchanged to arch-role-reading.
+  ;   worker     a one-argument caller macro, applied to the material.
+  ;   task       forwarded unchanged to arch-role-reading.
+  ;
+  ; Example:
+  ;   (arch-persona-revision
+  ;     "Keep the audience interface honest."
+  ;     audience-view
+  ;     draft
+  ;     "Write a customer-facing maintenance notice.")
+  ;
+  ; Cost: worker creates the attempt, arch-role-reading audits it, and worker
+  ; receives the std-audit as input for the revision.
+  (~ arch-persona-revision (lens audience worker task)
+    '(-> (arch-role-reading ,lens ,audience (,worker ,task))
+         (,worker ,task)
+         "Revise for the audience while stating the limitation, uncertainty, or dependency the role would otherwise hide."))
+
+  ; (arch-persona-work lens audience worker judge task) — the simple entry
+  ; point: build an audience-facing attempt, accept a checked revision, or
+  ; lazily retain a conservative version.
+  ;
+  ;   lens       forwarded unchanged to arch-persona-revision.
+  ;   audience   forwarded unchanged to arch-persona-revision.
+  ;   worker     a one-argument caller macro, applied to the material.
+  ;   judge      forwarded unchanged to std-try-else.
+  ;   task       forwarded unchanged to arch-persona-revision.
+  ;
+  ; Example:
+  ;   (arch-persona-work
+  ;     "Judge whether the public role remains honest."
+  ;     audience-view
+  ;     draft
+  ;     std-binary
+  ;     "Explain the data retention change to customers.")
+  ;
+  ; Cost: the primary revision is judged first; fallback is lazy.
+  (~ arch-persona-work (lens audience worker judge task)
+    '(std-try-else ,judge
+       (-> (arch-persona-revision ,lens ,audience ,worker ,task)
+           "Return the audience-facing version and its one material limitation.")
+       (-> (,worker ,task)
+           "Return a plain version that does not overstate certainty or authority.")))
+
+  ; (arch-persona-cycle lens audience worker stop value) — repeatedly revise
+  ; the interface until the stop macro accepts the current value.
+  ;
+  ;   lens       forwarded unchanged to arch-persona-cycle.
+  ;   audience   forwarded unchanged to arch-persona-cycle.
+  ;   worker     forwarded unchanged to arch-persona-cycle.
+  ;   stop       a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;              ordinary question into that protocol; std/seam's std-gated-by
+  ;              makes the verdict mechanical and free.
+  ;   value      forwarded unchanged to arch-persona-revision.
+  ;
+  ; Example:
+  ;   (arch-persona-cycle
+  ;     "Check whether the interface hides important context."
+  ;     audience-view
+  ;     revise
+  ;     std-binary
+  ;     "Draft the public incident update.")
+  ;
+  ; Cost: recursive and budget-bounded; arch-persona-revision is repeated per
+  ; round, so use a strict stop rule.
+  (~ arch-persona-cycle (lens audience worker stop value)
+    '(% (,stop ,value)
+      ,value
+      (arch-persona-cycle ,lens ,audience ,worker ,stop
+        (arch-persona-revision ,lens ,audience ,worker ,value))))
+)

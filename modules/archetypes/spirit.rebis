@@ -1,0 +1,160 @@
+; archetypes/spirit — orientation inside confusion without unquestionable
+; authority.
+;
+; Spirit is implemented as a meaning-making and teaching role. It gives a
+; situation a question, principle, or direction, then keeps that direction
+; answerable to a skeptic, a learner, and observable limits.
+(
+  (# archetypes/core)
+  (# archetypes/relations)
+  (# std/canon)
+  (# std/debate)
+  (# std/dialectic)
+  (# std/reflexion)
+  (# std/shape)
+
+  ; (arch-spirit-question lens task) — generate an organizing question, provisional
+  ; meaning, and concrete implication without treating the first answer as
+  ; revelation.
+  ;
+  ;   lens   mediator over the readings below. A symbol mediates
+  ;          deterministically and fires no model; a prompt costs one call.
+  ;   task   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-spirit-question
+  ;     "Find a useful organizing question, not a final doctrine."
+  ;     "The team keeps fixing symptoms instead of the source.")
+  ;
+  ; Cost: task is read through three branches.
+  (~ arch-spirit-question (lens task)
+    '(-> ([,lens]
+          (-> ,task
+              "What hidden meaning, rule, or organizing question would make this situation more intelligible?")
+          (-> ,task
+              "What value or direction is trying to emerge, and what evidence supports that reading?")
+          (-> ,task
+              "What ordinary action would follow if the reading were useful?"))
+         "Keep the interpretation provisional, testable, and connected to the task."))
+
+  ; (arch-teachable-reading teacher learner task) — pass a reading through a
+  ; teacher and learner, then preserve the learner's unresolved question.
+  ;
+  ;   teacher   a one-argument caller macro, applied to the material.
+  ;   learner   a one-argument caller macro, applied to the material.
+  ;   task      the material under examination; read once per branch it
+  ;             appears in.
+  ;
+  ; Example:
+  ;   (arch-teachable-reading guide skeptic "Explain the service's failure mode.")
+  ;
+  ; Cost: teacher and learner each receive the task, followed by a std-synthesis
+  ; prompt.
+  (~ arch-teachable-reading (teacher learner task)
+    '(-> (,teacher ,task)
+         (,learner ,task)
+         (-> ,task
+             "State what remains uncertain, what the learner should verify, and which claim must not be accepted on authority alone.")
+         "Return the teachable reading, its limit, and the next question."))
+
+  ; (arch-spirit-with-check teacher skeptic task) — hold orientation and
+  ; skepticism in one mediation. teacher and skeptic are one-argument macro
+  ; symbols; the square mediator is the skeptic's topic or prompt.
+  ;
+  ;   teacher   forwarded unchanged to arch-spirit-question.
+  ;   skeptic   mediator over the readings below. A symbol mediates
+  ;             deterministically and fires no model; a prompt costs one call.
+  ;   task      forwarded unchanged to arch-spirit-question.
+  ;
+  ; Example:
+  ;   (arch-spirit-with-check
+  ;     guide
+  ;     "Select the interpretation with the clearest evidence and limits."
+  ;     "Why does this project keep repeating the same incident?")
+  ;
+  ; Cost: arch-spirit-question has three branches; the task is also given to the
+  ; skeptic's comparison branch.
+  (~ arch-spirit-with-check (teacher skeptic task)
+    '(-> ([,skeptic]
+          (arch-spirit-question ,teacher ,task)
+          (-> ,task
+              "List the strongest reason this interpretation could be wrong or limited."))
+         "Choose an orientation only with its falsifier and practical limit attached."))
+
+  ; (arch-spirit-counsel teacher skeptic worker task) — orient a worker, let a
+  ; skeptic inspect the orientation, and route the result into an actionable
+  ; answer.
+  ;
+  ;   teacher   forwarded unchanged to arch-spirit-question.
+  ;   skeptic   mediator over the readings below. A symbol mediates
+  ;             deterministically and fires no model; a prompt costs one call.
+  ;   worker    a one-argument caller macro, applied to the material.
+  ;   task      forwarded unchanged to arch-spirit-question.
+  ;
+  ; Example:
+  ;   (arch-spirit-counsel
+  ;     guide
+  ;     "Reject explanations that cannot name a test."
+  ;     draft
+  ;     "Write a recovery plan for the service.")
+  ;
+  ; Cost: the worker is used after the orientation and the skeptic mediates
+  ; two additional readings.
+  (~ arch-spirit-counsel (teacher skeptic worker task)
+    '(-> (arch-spirit-question ,teacher ,task)
+         (-> ([,skeptic]
+              (-> (,worker ,task)
+                  "Apply the orientation to produce a concrete answer.")
+             (-> ,task
+                  "Name the evidence that would limit or falsify the orientation."))
+             "Keep the answer useful without granting the orientation authority over the evidence.")
+         "State the action, its guiding question, and the check that could overturn it."))
+
+  ; (arch-spirit-orientation teacher skeptic worker verifier task) — use a
+  ; verifier as a lazy acceptance std-gate; rejection falls back to a teachable
+  ; reading instead of forcing a grand interpretation.
+  ;
+  ;   teacher    forwarded unchanged to arch-spirit-counsel.
+  ;   skeptic    forwarded unchanged to arch-spirit-counsel.
+  ;   worker     forwarded unchanged to arch-spirit-counsel.
+  ;   verifier   forwarded unchanged to std-try-else.
+  ;   task       forwarded unchanged to arch-spirit-counsel.
+  ;
+  ; Example:
+  ;   (arch-spirit-orientation
+  ;     guide
+  ;     "Choose only grounded interpretations."
+  ;     draft
+  ;     std-binary
+  ;     "Find the cause of the repeated deploy failure.")
+  ;
+  ; Cost: the accepted counseling path is tried first; fallback is lazy.
+  (~ arch-spirit-orientation (teacher skeptic worker verifier task)
+    '(std-try-else ,verifier
+       (-> (arch-spirit-counsel ,teacher ,skeptic ,worker ,task)
+           "Return the action and the evidence that would change the interpretation.")
+       (arch-teachable-reading ,teacher ,worker ,task)))
+
+  ; (arch-spirit-cycle teacher worker stop value) — repeatedly refine an
+  ; orientation through a worker until stop accepts it.
+  ;
+  ;   teacher   forwarded unchanged to arch-spirit-cycle.
+  ;   worker    a one-argument caller macro, applied to the material.
+  ;   stop      a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;             ordinary question into that protocol; std/seam's std-gated-by
+  ;             makes the verdict mechanical and free.
+  ;   value     the material under examination; read once per branch it
+  ;             appears in.
+  ;
+  ; Example:
+  ;   (arch-spirit-cycle guide revise std-binary "Draft the incident explanation.")
+  ;
+  ; Cost: recursive and bounded by the host's expansion and model budgets.
+  (~ arch-spirit-cycle (teacher worker stop value)
+    '(% (,stop ,value)
+      ,value
+      (arch-spirit-cycle ,teacher ,worker ,stop
+        (-> (,worker ,value)
+            "Refine the guiding question while preserving the evidence and naming its limit."))))
+)

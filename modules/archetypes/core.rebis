@@ -1,0 +1,299 @@
+; archetypes/core — the small kernel used by the archetype protocols.
+;
+; This module contains topology rather than a single “archetype classifier”.
+; A caller chooses the lens, worker, reconciler, and stop rule. A square
+; executes every branch before its mediator; any instruction that must run
+; after mediation is placed downstream in an explicit arrow.
+;
+; A quoted body is a macro template; commas splice caller syntax into that
+; template. Repeated parameters are intentional and are called out in the
+; cost notes below.
+;
+; PARAMETER VOCABULARY — the whole archetypes family reuses these roles, so a
+; macro's signature tells you most of its contract before you read it:
+;
+;   lens, reconcile, reconciler, mediator, center, skeptic
+;       A MEDIATOR. Passed in mediator position, so a symbol mediates
+;       deterministically and fires no model, while a prompt or a whole program
+;       mediates conventionally at the cost of one call.
+;   judge, stop, verifier
+;       A ONE-ARGUMENT 0/1 JUDGE, used as a `%` condition. std/canon's
+;       std-binary wraps an ordinary question into that protocol; std/seam's
+;       std-gated-by makes the verdict mechanical, free, and impossible for a
+;       persuasive answer to argue with. A few macros instead take `judge` in
+;       mediator position — those say so in their own parameter block.
+;   worker, audience, teacher, speaker, inverter, counterpart, step
+;       A ONE-ARGUMENT CALLER MACRO, applied to the material.
+;   work, task, value, left, right, first, second, third, north, south,
+;   east, west, horizontal, vertical
+;       MATERIAL. Any syntax — a prompt, an arrow, a square, a port, or another
+;       macro call. Read once per branch it appears in, which is what the cost
+;       notes count.
+;   accepted, rejected, continue
+;       COMPLETE CONTINUATION EXPRESSIONS, not macro names to be called. Only
+;       the selected one expands.
+;
+; Composition macros forward their parameters to an inner protocol unchanged;
+; each one names the protocol it hands them to.
+(
+  (# std/canon)
+  (# std/dialectic)
+  (# std/flow)
+  (# std/gate)
+  (# std/loops)
+  (# std/shape)
+
+  ; (arch-name-pattern lens work) — make a labeled reading, an evidence reading,
+  ; and then require a downstream statement of the consequence.
+  ;
+  ;   lens   mediator over the readings below. A symbol mediates
+  ;          deterministically and fires no model; a prompt costs one call.
+  ;   work   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-name-pattern
+  ;     "Name the pattern and cite the evidence."
+  ;     "The service retries but never records an attempt.")
+  ;
+  ; Cost: work is read std-twice, once by each square branch.
+  (~ arch-name-pattern (lens work)
+    '(-> ([,lens]
+          (-> ,work
+              "Give one concise label for the active pattern.")
+          (-> ,work
+              "List the observable evidence that supports the label and one consequence."))
+         "Keep the label narrow; do not infer a personality or diagnosis."))
+
+  ; (arch-reflect-pattern lens work) — read a pattern in both orientations, then
+  ; make the omitted counterforce explicit after the dialectical mediation.
+  ;
+  ;   lens   forwarded unchanged to std-diamond.
+  ;   work   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-reflect-pattern
+  ;     "Find the excluded counterforce."
+  ;     "The migration plan optimizes speed over rollback safety.")
+  ;
+  ; Cost: work appears in both orientations and may fire std-twice.
+  (~ arch-reflect-pattern (lens work)
+    '(-> (std-diamond ,lens
+             (-> ,work
+                 "State the useful claim in this framing.")
+             (<- ,work
+                 "State the cost, limit, or counterforce that this framing suppresses."))
+         "Return the claim and counterforce as two distinct, evidence-bound parts."))
+
+  ; (arch-polarity reconcile left right) — place two positions in both flow
+  ; directions before the caller's reconciler chooses what can coexist.
+  ;
+  ;   reconcile   mediator over the readings below. A symbol mediates
+  ;               deterministically and fires no model; a prompt costs one call.
+  ;   left        the material under examination; read once per branch it
+  ;               appears in.
+  ;   right       the material under examination; read once per branch it
+  ;               appears in.
+  ;
+  ; Example:
+  ;   (arch-polarity
+  ;     "Reconcile the tradeoff without erasing either constraint."
+  ;     "ship quickly"
+  ;     "protect rollback safety")
+  ;
+  ; Cost: both positions participate in two arrow chains.
+  (~ arch-polarity (reconcile left right)
+    '(-> ([,reconcile]
+          (-> ,left
+              ,right
+              "Say what the second position reveals about the first.")
+          (<- ,left
+              ,right
+              "Say what the first position changes in the second."))
+         "Return the smallest workable polarity, not a vague compromise."))
+
+  ; (arch-triad reconcile first second third) — arch-converge three partial readings;
+  ; the std-synthesis instruction is downstream, not an accidental fourth branch.
+  ;
+  ;   reconcile   mediator over the readings below. A symbol mediates
+  ;               deterministically and fires no model; a prompt costs one call.
+  ;   first       the material under examination; read once per branch it
+  ;               appears in.
+  ;   second      the material under examination; read once per branch it
+  ;               appears in.
+  ;   third       the material under examination; read once per branch it
+  ;               appears in.
+  ;
+  ; Example:
+  ;   (arch-triad
+  ;     "Synthesize the three readings into one testable account."
+  ;     "evidence"
+  ;     "cost"
+  ;     "next action")
+  ;
+  ; Cost: each supplied reading is an independent square branch.
+  (~ arch-triad (reconcile first second third)
+    '(-> ([,reconcile]
+          ,first
+          ,second
+          ,third)
+         "Preserve the distinctions between the three results in the synthesis."))
+
+  ; (arch-round-trip worker value) — send a value through a worker and backflow
+  ; the worker's result into the original value. This tests what survives a
+  ; return to the starting frame.
+  ;
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   value    the material under examination; read once per branch it
+  ;            appears in.
+  ;
+  ; Example:
+  ;   (arch-round-trip std-final-only "Draft a one-step rollback procedure.")
+  ;
+  ; Cost: worker fires std-twice by construction.
+  (~ arch-round-trip (worker value)
+    '(-> (,worker ,value)
+         (<- ,value
+             (,worker ,value))))
+
+  ; (arch-lazy-gate judge accepted rejected value) — evaluate judge first and
+  ; expand only the chosen continuation. judge, accepted, and rejected are
+  ; macro symbols; judge must return exactly 0 or 1.
+  ;
+  ;   judge      a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;              ordinary question into that protocol; std/seam's std-gated-by
+  ;              makes the verdict mechanical and free.
+  ;   accepted   a one-argument caller macro, applied to the material.
+  ;   rejected   a one-argument caller macro, applied to the material.
+  ;   value      the material under examination; read once per branch it
+  ;              appears in.
+  ;
+  ; Example:
+  ;   (arch-lazy-gate
+  ;     std-binary
+  ;     std-final-only
+  ;     std-one-word
+  ;     "Is this rollout safe to execute?")
+  ;
+  ; Cost: only the selected continuation fires, but value is evaluated in the
+  ; judge and selected branch wherever it is spliced.
+  (~ arch-lazy-gate (judge accepted rejected value)
+    '(% (,judge ,value)
+      (,accepted ,value)
+      (,rejected ,value)))
+
+  ; (arch-audit-pair judge worker value) — independently derive the same value
+  ; std-twice and mediate the pair. judge is a square mediator, so it may be a
+  ; prompt or a deterministic topic symbol.
+  ;
+  ;   judge    mediator over the readings below. A symbol mediates
+  ;            deterministically and fires no model; a prompt costs one call.
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   value    the material under examination; read once per branch it
+  ;            appears in.
+  ;
+  ; Example:
+  ;   (arch-audit-pair
+  ;     "Choose the result that stays grounded in the evidence."
+  ;     std-with-evidence
+  ;     "Review the cache invalidation change.")
+  ;
+  ; Cost: worker fires std-twice and the mediator sees both results.
+  (~ arch-audit-pair (judge worker value)
+    '([,judge]
+      (,worker ,value)
+      (,worker ,value)))
+
+  ; (arch-evidence-pass lens worker task) — make a worker answer three
+  ; independent evidence passes: claim, support, and uncertainty.
+  ;
+  ;   lens     mediator over the readings below. A symbol mediates
+  ;            deterministically and fires no model; a prompt costs one call.
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   task     the material under examination; read once per branch it
+  ;            appears in.
+  ;
+  ; Example:
+  ;   (arch-evidence-pass
+  ;     "Mediate the evidence passes."
+  ;     inspect
+  ;     "Inspect the parser regression.")
+  ;
+  ; Cost: worker fires three times. This is a deliberate std-audit, not a cheap
+  ; wrapper around one prompt.
+  (~ arch-evidence-pass (lens worker task)
+    '(-> ([,lens]
+          (-> (,worker ,task)
+              "Extract the central claim without adding new facts.")
+          (-> (,worker ,task)
+              "List the strongest observable evidence for the claim.")
+          (-> (,worker ,task)
+              "List the uncertainty, missing evidence, and condition that could change the claim."))
+         "Return a compact account with claim, evidence, and uncertainty."))
+
+  ; (arch-dialectic-pass reconcile left right task) — std-apply two caller-supplied
+  ; workers to one task, read their relation in both directions, and finish
+  ; with a concrete integration.
+  ;
+  ;   reconcile   forwarded unchanged to std-diamond.
+  ;   left        a one-argument caller macro, applied to the material.
+  ;   right       a one-argument caller macro, applied to the material.
+  ;   task        the material under examination; read once per branch it
+  ;               appears in.
+  ;
+  ; Example:
+  ;   (arch-dialectic-pass
+  ;     "Reconcile implementation and operations."
+  ;     build
+  ;     operate
+  ;     "Design the deployment boundary.")
+  ;
+  ; Cost: each worker is used in both directional readings.
+  (~ arch-dialectic-pass (reconcile left right task)
+    '(-> (std-diamond ,reconcile
+             (,left ,task)
+             (,right ,task))
+         "Turn the two-direction reading into one action with an explicit tradeoff."))
+
+  ; (arch-input-review worker judge) — receive host input on the conventional
+  ; input port, run a worker, and lazily choose a compact or explanatory
+  ; continuation. Hosts may feed a previous answer, a file excerpt, or a
+  ; typed value through the input seam.
+  ;
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   judge    a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;            ordinary question into that protocol; std/seam's std-gated-by
+  ;            makes the verdict mechanical and free.
+  ;
+  ; Example:
+  ;   (arch-input-review std-with-evidence std-binary)
+  ;
+  ; Cost: the worker runs in the judge and selected branch.
+  (~ arch-input-review (worker judge)
+    '(& input
+      (% (,judge (,worker input))
+        (-> (,worker input)
+            "Return only the reviewed result.")
+        (-> input
+            "Explain why the input did not pass review and name the next check."))))
+
+  ; (arch-converge step same value) — expose the standard stabilization std-loop
+  ; with a small archetype vocabulary. step and same are one-argument and
+  ; two-argument macro symbols respectively; same must answer 0 or 1.
+  ;
+  ;   step    loop machinery — see the cost note; the value is spliced into
+  ;           both the stop check and the continuation.
+  ;   same    loop machinery — see the cost note; the value is spliced into
+  ;           both the stop check and the continuation.
+  ;   value   loop machinery — see the cost note; the value is spliced into
+  ;           both the stop check and the continuation.
+  ;
+  ; Example:
+  ;   (arch-converge revise std-agreed "Draft the incident summary.")
+  ;
+  ; Cost: each round may re-run step in the stop test and continuation; use
+  ; runtime budgets and a conservative same predicate.
+  (~ arch-converge (step same value)
+    '(std-stabilize ,value ,step ,same))
+)

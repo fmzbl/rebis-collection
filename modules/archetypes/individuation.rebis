@@ -1,0 +1,168 @@
+; archetypes/individuation — hold partial readings in relation until a more
+; capable working form appears.
+;
+; Individuation is treated as an iterative engineering protocol: arch-encounter
+; what the current frame excludes, hear a counterpart, reconcile the tension,
+; and return to the task. It is not a promise of psychological completion.
+; The verifier and runtime budgets are the stopping boundary.
+(
+  (# archetypes/core)
+  (# archetypes/rebirth)
+  (# archetypes/relations)
+  (# archetypes/shadow)
+  (# std/canon)
+  (# std/committee)
+  (# std/dialectic)
+  (# std/loops)
+  (# std/shape)
+
+  ; (arch-encounter lens worker task) — make an attempt, inspect its excluded
+  ; material, and ask the counterpart to make its strongest case.
+  ;
+  ;   lens     mediator over the readings below. A symbol mediates
+  ;            deterministically and fires no model; a prompt costs one call.
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   task     forwarded unchanged to arch-shadow-scan.
+  ;
+  ; Example:
+  ;   (arch-encounter
+  ;     "Mediate the current frame and what it excludes."
+  ;     draft
+  ;     "Design the data retention policy.")
+  ;
+  ; Cost: worker is repeated for the attempt, shadow scan, and counterpart.
+  (~ arch-encounter (lens worker task)
+    '(-> ([,lens]
+          (-> (,worker ,task)
+              "State the current working account and the constraint it optimizes.")
+          (arch-shadow-scan ,lens (,worker ,task))
+          (arch-counterpart ,lens (,worker ,task)))
+         "Keep the account, excluded material, and counterpart distinct before reconciling them."))
+
+  ; (arch-reconcile mediator left right task) — compare two one-argument workers
+  ; in both directions and ask the mediator for a concrete relation.
+  ;
+  ;   mediator   mediator over the readings below. A symbol mediates
+  ;              deterministically and fires no model; a prompt costs one call.
+  ;   left       a one-argument caller macro, applied to the material.
+  ;   right      a one-argument caller macro, applied to the material.
+  ;   task       the material under examination; read once per branch it
+  ;              appears in.
+  ;
+  ; Example:
+  ;   (arch-reconcile
+  ;     "Reconcile speed and operational safety."
+  ;     product-view
+  ;     operator-view
+  ;     "Release the new billing service.")
+  ;
+  ; Cost: both workers are used in both directional readings.
+  (~ arch-reconcile (mediator left right task)
+    '(-> ([,mediator]
+          (-> (,left ,task)
+              (,right ,task)
+              "What does the right-side constraint reveal about the left-side proposal?")
+          (<- (,left ,task)
+              (,right ,task)
+              "What does the left-side proposal require the right side to change?"))
+         "Return one relation that preserves the strongest constraint on each side."))
+
+  ; (arch-individuation-pass lens worker mediator task) — perform one long
+  ; arch-encounter/reconciliation pass and convert the result into a changed
+  ; working question.
+  ;
+  ;   lens       forwarded unchanged to arch-encounter.
+  ;   worker     forwarded unchanged to arch-encounter.
+  ;   mediator   forwarded unchanged to arch-reconcile.
+  ;   task       forwarded unchanged to arch-encounter.
+  ;
+  ; Example:
+  ;   (arch-individuation-pass
+  ;     "Find the frame's excluded evidence."
+  ;     draft
+  ;     "Reconcile the useful aim with the omitted cost."
+  ;     "Choose an ownership model for the queue.")
+  ;
+  ; Cost: arch-encounter and arch-reconcile each repeat their worker input; this is a
+  ; deliberate pass rather than a single classification prompt.
+  (~ arch-individuation-pass (lens worker mediator task)
+    '(-> (arch-encounter ,lens ,worker ,task)
+         (arch-reconcile ,mediator ,worker ,lens ,task)
+         (arch-shadow-integration ,lens ,mediator ,task)
+         "State what changed in the relation between the parts, what remains unresolved, and the next observation that would discriminate between them."))
+
+  ; (arch-individuation-cycle lens worker mediator verifier task) — stop at a
+  ; std-verified pass or feed the unresolved pass back into another arch-encounter.
+  ; verifier must return exactly 0 or 1.
+  ;
+  ;   lens       forwarded unchanged to arch-individuation-pass.
+  ;   worker     forwarded unchanged to arch-individuation-pass.
+  ;   mediator   forwarded unchanged to arch-individuation-pass.
+  ;   verifier   a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;              ordinary question into that protocol; std/seam's std-gated-by
+  ;              makes the verdict mechanical and free.
+  ;   task       forwarded unchanged to arch-individuation-pass.
+  ;
+  ; Example:
+  ;   (arch-individuation-cycle
+  ;     "Find what the current design leaves outside."
+  ;     draft
+  ;     "Reconcile the design and its operational shadow."
+  ;     std-binary
+  ;     "Design the handoff between teams.")
+  ;
+  ; Cost: recursive and intentionally expensive; each rejected round repeats
+  ; shadow, counterpart, reconciliation, and integration work.
+  (~ arch-individuation-cycle (lens worker mediator verifier task)
+    '(% (,verifier (arch-individuation-pass ,lens ,worker ,mediator ,task))
+      (-> (arch-rebirth-cycle ,lens ,worker ,verifier ,task)
+          "Return the verified relation as an ordinary action with an owner and evidence.")
+      (arch-individuation-cycle ,lens ,worker ,mediator ,verifier
+        (arch-individuation-pass ,lens ,worker ,mediator ,task))))
+
+  ; (arch-individuate lens worker mediator verifier task) — the compact public
+  ; entry point for the full encounter/reconciliation/return cycle.
+  ;
+  ;   lens       forwarded unchanged to arch-individuation-cycle.
+  ;   worker     forwarded unchanged to arch-individuation-cycle.
+  ;   mediator   forwarded unchanged to arch-individuation-cycle.
+  ;   verifier   forwarded unchanged to arch-individuation-cycle.
+  ;   task       forwarded unchanged to arch-individuation-cycle.
+  ;
+  ; Example:
+  ;   (arch-individuate
+  ;     "Keep excluded evidence visible."
+  ;     draft
+  ;     "Find a workable relation between competing constraints."
+  ;     std-binary
+  ;     "Plan the migration from shared to owned databases.")
+  ;
+  ; Cost: delegates to the recursive cycle; use a strict verifier.
+  (~ arch-individuate (lens worker mediator verifier task)
+    '(arch-individuation-cycle ,lens ,worker ,mediator ,verifier ,task))
+
+  ; (arch-individuation-panel mediator chair first second third task) — use a
+  ; standard chaired panel to make several differentiated readings hear the
+  ; same task under one framing. All panel arguments are one-argument macros.
+  ;
+  ;   mediator   forwarded unchanged to std-chaired-panel.
+  ;   chair      forwarded unchanged to std-chaired-panel.
+  ;   first      forwarded unchanged to std-chaired-panel.
+  ;   second     forwarded unchanged to std-chaired-panel.
+  ;   third      forwarded unchanged to std-chaired-panel.
+  ;   task       forwarded unchanged to std-chaired-panel.
+  ;
+  ; Example:
+  ;   (arch-individuation-panel
+  ;     "Synthesize the differentiated readings."
+  ;     chair
+  ;     product-view
+  ;     operator-view
+  ;     security-view
+  ;     "Choose the rollout boundary.")
+  ;
+  ; Cost: chair and all three panelists run; the chair's answer flows into
+  ; the panel through the standard arrow topology.
+  (~ arch-individuation-panel (mediator chair first second third task)
+    '(std-chaired-panel ,chair ,mediator ,first ,second ,third ,task))
+)

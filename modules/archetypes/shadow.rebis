@@ -1,0 +1,162 @@
+; archetypes/shadow — disciplined contact with what a frame excludes.
+;
+; “Shadow” is used here as a work-level metaphor: omitted evidence, denied
+; cost, contradictory requirements, or an alternative account. These macros
+; never classify a person and never make a psychological diagnosis. A caller
+; supplies the lens and the worker so the protocol can inspect any material.
+;
+; The central shape is attempt → counter-reading → revision. The revision is
+; not an automatic “positive” answer: the prompts ask it to preserve useful
+; constraints while making the excluded material operational.
+(
+  (# archetypes/core)
+  (# std/canon)
+  (# std/dialectic)
+  (# std/reflexion)
+  (# std/search)
+  (# std/shape)
+
+  ; (arch-shadow-scan lens work) — make three evidence-bound counter-readings:
+  ; exclusion, contradiction, and consequence.
+  ;
+  ;   lens   mediator over the readings below. A symbol mediates
+  ;          deterministically and fires no model; a prompt costs one call.
+  ;   work   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-shadow-scan
+  ;     "Find evidence the plan excludes."
+  ;     "The plan has no rollback step.")
+  ;
+  ; Cost: work is read in three independent branches.
+  (~ arch-shadow-scan (lens work)
+    '(-> ([,lens]
+          (-> ,work
+              "Identify the assumption, stakeholder, or cost that the work leaves outside its frame.")
+          (-> ,work
+              "Find a contradiction or inconvenient fact that the current account cannot explain.")
+          (-> ,work
+              "State the practical consequence if the excluded material is real."))
+         "Do not diagnose a person; point to observable features of the work."))
+
+  ; (arch-shadow-confront lens worker task) — create an attempt, expose its
+  ; excluded material, and send that material back into a constrained rewrite.
+  ;
+  ;   lens     forwarded unchanged to arch-shadow-scan.
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   task     forwarded unchanged to arch-shadow-scan.
+  ;
+  ; Example:
+  ;   (arch-shadow-confront
+  ;     "Review for operational blind spots."
+  ;     draft
+  ;     "Design the cache invalidation policy.")
+  ;
+  ; Cost: worker fires in the attempt and again in the revision; the scan
+  ; itself has three branches.
+  (~ arch-shadow-confront (lens worker task)
+    '(-> (,worker ,task)
+         (arch-shadow-scan ,lens (,worker ,task))
+         (-> (,worker ,task)
+             "Revise the attempt in response to the counter-reading. Preserve the useful constraint, and make one change that can be tested.")))
+
+  ; (arch-shadow-integration lens reconcile work) — use a dialectical std-synthesis
+  ; to hold the original account, the counter-reading, and an operational
+  ; integration together.
+  ;
+  ;   lens        forwarded unchanged to arch-shadow-scan.
+  ;   reconcile   forwarded unchanged to std-synthesis.
+  ;   work        forwarded unchanged to arch-shadow-scan.
+  ;
+  ; Example:
+  ;   (arch-shadow-integration
+  ;     "Find omitted evidence."
+  ;     "Reconcile the original and counter-reading."
+  ;     "The queue design assumes workers never stall.")
+  ;
+  ; Cost: work is present in both the thesis and scan; the scan has three
+  ; branches before std-synthesis.
+  (~ arch-shadow-integration (lens reconcile work)
+    '(-> (std-synthesis ,reconcile
+             (-> ,work
+                 "State the useful claim in the original work.")
+             (arch-shadow-scan ,lens ,work))
+         "Write the integrated result as one changed design, one preserved constraint, and one verification step."))
+
+  ; (arch-shadow-or-continue judge lens work continue) — lazily choose an
+  ; integration when the scan passes the caller's judge, otherwise call the
+  ; ordinary continuation. continue is a one-argument macro symbol.
+  ;
+  ;   judge      a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;              ordinary question into that protocol; std/seam's std-gated-by
+  ;              makes the verdict mechanical and free.
+  ;   lens       forwarded unchanged to arch-shadow-scan.
+  ;   work       forwarded unchanged to arch-shadow-scan.
+  ;   continue   a one-argument caller macro, applied to the material.
+  ;
+  ; Example:
+  ;   (arch-shadow-or-continue
+  ;     std-binary
+  ;     "Does this review identify a real blind spot?"
+  ;     "The plan skips failure recovery."
+  ;     std-final-only)
+  ;
+  ; Cost: the scan is evaluated by judge; only one branch is selected.
+  (~ arch-shadow-or-continue (judge lens work continue)
+    '(% (,judge (arch-shadow-scan ,lens ,work))
+      (-> (arch-shadow-integration ,lens ,lens ,work)
+          "State the integrated change and its verification.")
+      (,continue ,work)))
+
+  ; (arch-shadow-work lens worker judge task) — the simple public entry point:
+  ; attempt, integrate if accepted, and fall back lazily to a guarded rewrite.
+  ;
+  ;   lens     forwarded unchanged to arch-shadow-integration.
+  ;   worker   forwarded unchanged to arch-shadow-confront.
+  ;   judge    forwarded unchanged to std-try-else.
+  ;   task     forwarded unchanged to arch-shadow-confront.
+  ;
+  ; Example:
+  ;   (arch-shadow-work
+  ;     "Look for missing rollback and monitoring evidence."
+  ;     draft
+  ;     std-binary
+  ;     "Design the payment retry policy.")
+  ;
+  ; Cost: the primary attempt is built once for the primary path; a rejected
+  ; primary pays for the fallback path as well. The nested scan is three-way.
+  (~ arch-shadow-work (lens worker judge task)
+    '(std-try-else ,judge
+       (-> (arch-shadow-integration ,lens ,lens
+               (arch-shadow-confront ,lens ,worker ,task))
+           "Deliver the revised work with the excluded material made testable.")
+       (-> (arch-shadow-confront ,lens ,worker ,task)
+           "Keep the revision conservative: name the unresolved shadow and the next observation needed.")))
+
+  ; (arch-shadow-cycle lens worker stop value) — repeat shadow confrontation
+  ; until stop accepts the current value. The conditional makes recursion
+  ; lazy, so the next round is not expanded after acceptance.
+  ;
+  ;   lens     forwarded unchanged to arch-shadow-cycle.
+  ;   worker   forwarded unchanged to arch-shadow-cycle.
+  ;   stop     a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;            ordinary question into that protocol; std/seam's std-gated-by
+  ;            makes the verdict mechanical and free.
+  ;   value    forwarded unchanged to arch-shadow-confront.
+  ;
+  ; Example:
+  ;   (arch-shadow-cycle
+  ;     "Find the next untested assumption."
+  ;     revise
+  ;     std-binary
+  ;     "Draft the incident response.")
+  ;
+  ; Cost: geometric in rounds and bounded by the runtime's macro/model
+  ; budgets. stop must return exactly 0 or 1.
+  (~ arch-shadow-cycle (lens worker stop value)
+    '(% (,stop ,value)
+      ,value
+      (arch-shadow-cycle ,lens ,worker ,stop
+        (arch-shadow-confront ,lens ,worker ,value))))
+)

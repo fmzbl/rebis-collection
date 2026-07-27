@@ -1,0 +1,174 @@
+; archetypes/rebirth — transformation as threshold, descent, and return.
+;
+; A changed interpretation is not complete until it returns to ordinary
+; action. These macros therefore keep the cost of transition, the evidence
+; that survives it, and a concrete next step in the same graph.
+(
+  (# archetypes/core)
+  (# std/canon)
+  (# std/dialectic)
+  (# std/evolve)
+  (# std/gate)
+  (# std/loops)
+  (# std/shape)
+
+  ; (arch-threshold lens task) — identify the arrangement ending, the continuity
+  ; to preserve, and the evidence that the transition has begun.
+  ;
+  ;   lens   mediator over the readings below. A symbol mediates
+  ;          deterministically and fires no model; a prompt costs one call.
+  ;   task   the material under examination; read once per branch it
+  ;          appears in.
+  ;
+  ; Example:
+  ;   (arch-threshold
+  ;     "Name the ending and the continuity."
+  ;     "Move from a single deploy train to service-owned releases.")
+  ;
+  ; Cost: task is read in three branches.
+  (~ arch-threshold (lens task)
+    '(-> ([,lens]
+          (-> ,task
+              "What familiar arrangement, assumption, or identity is ending?")
+          (-> ,task
+              "What capability, value, or evidence must remain continuous across the change?")
+          (-> ,task
+              "What observation would show that the threshold has actually been crossed?"))
+         "Keep the threshold specific; do not celebrate a change before its evidence exists."))
+
+  ; (arch-descent worker lens task) — work through the arch-threshold while naming
+  ; the cost, uncertainty, and loss that a transformation requires.
+  ;
+  ;   worker   a one-argument caller macro, applied to the material.
+  ;   lens     forwarded unchanged to arch-threshold.
+  ;   task     forwarded unchanged to arch-threshold.
+  ;
+  ; Example:
+  ;   (arch-descent
+  ;     draft
+  ;     "Name the cost before the reward."
+  ;     "Replace the legacy queue.")
+  ;
+  ; Cost: arch-threshold is repeated as the worker's input and the cost std-audit.
+  (~ arch-descent (worker lens task)
+    '(-> (arch-threshold ,lens ,task)
+         (,worker (arch-threshold ,lens ,task))
+         (-> (arch-threshold ,lens ,task)
+             "Name what must be surrendered, learned, or temporarily made uncertain.")
+         "Return the changed work with its transition cost explicit."))
+
+  ; (arch-return worker verifier task) — verify a changed result and translate it
+  ; into one ordinary action. verifier is a one-argument macro that should
+  ; produce a 0/1 protocol when used as a std-gate.
+  ;
+  ;   worker     a one-argument caller macro, applied to the material.
+  ;   verifier   a one-argument caller macro, applied to the material.
+  ;   task       the material under examination; read once per branch it
+  ;              appears in.
+  ;
+  ; Example:
+  ;   (arch-return
+  ;     draft
+  ;     std-binary
+  ;     "Turn the migration insight into tomorrow's operating step.")
+  ;
+  ; Cost: worker is used once for the result and once by verifier.
+  (~ arch-return (worker verifier task)
+    '(-> (,worker ,task)
+         (,verifier
+           "Does this changed result preserve the necessary evidence and constraint?")
+         "Translate the verified change into one ordinary next action with an owner and observation."))
+
+  ; (arch-rebirth-cycle lens worker verifier task) — std-compose the complete
+  ; threshold/descent/return sequence and close with an accountable action.
+  ;
+  ;   lens       forwarded unchanged to arch-threshold.
+  ;   worker     forwarded unchanged to arch-descent.
+  ;   verifier   forwarded unchanged to arch-return.
+  ;   task       forwarded unchanged to arch-threshold.
+  ;
+  ; Example:
+  ;   (arch-rebirth-cycle
+  ;     "Name what is ending and what must continue."
+  ;     draft
+  ;     std-binary
+  ;     "Move the release process to staged rollouts.")
+  ;
+  ; Cost: arch-threshold and arch-descent deliberately repeat their source material;
+  ; the verifier is the transition std-gate.
+  (~ arch-rebirth-cycle (lens worker verifier task)
+    '(-> (arch-threshold ,lens ,task)
+         (arch-descent ,worker ,lens ,task)
+         (arch-return ,worker ,verifier ,task)
+         "State the return as a small action that can be observed in ordinary work."))
+
+  ; (arch-threshold-choice lens judge worker task) — choose a arch-descent only when
+  ; the arch-threshold reading is accepted; otherwise keep a stable next question.
+  ;
+  ;   lens     forwarded unchanged to arch-threshold.
+  ;   judge    a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;            ordinary question into that protocol; std/seam's std-gated-by
+  ;            makes the verdict mechanical and free.
+  ;   worker   forwarded unchanged to arch-descent.
+  ;   task     forwarded unchanged to arch-threshold.
+  ;
+  ; Example:
+  ;   (arch-threshold-choice
+  ;     "Judge whether a real transition is present."
+  ;     std-binary
+  ;     draft
+  ;     "The team wants to replace the on-call rotation.")
+  ;
+  ; Cost: the arch-threshold is judged first and only one branch is expanded.
+  (~ arch-threshold-choice (lens judge worker task)
+    '(% (,judge (arch-threshold ,lens ,task))
+      (-> (arch-descent ,worker ,lens ,task)
+          "Name the first irreversible-looking claim and the safety check around it.")
+      (-> ,task
+          "Keep the current arrangement and define the evidence needed before changing it.")))
+
+  ; (arch-renewal-loop worker stop value) — expose the standard judged iteration
+  ; for a transformation that must keep returning to evidence.
+  ;
+  ;   worker   loop machinery — see the cost note; the value is spliced into
+  ;            both the stop check and the continuation.
+  ;   stop     loop machinery — see the cost note; the value is spliced into
+  ;            both the stop check and the continuation.
+  ;   value    loop machinery — see the cost note; the value is spliced into
+  ;            both the stop check and the continuation.
+  ;
+  ; Example:
+  ;   (arch-renewal-loop revise std-binary "Draft the staged migration.")
+  ;
+  ; Cost: each round is bounded by stop and the runtime budgets.
+  (~ arch-renewal-loop (worker stop value)
+    '(std-loop ,value ,worker ,stop))
+
+  ; (arch-rebirth-work lens worker verifier judge task) — run a complete
+  ; transition only when a judge accepts the arch-threshold; otherwise preserve a
+  ; concrete ordinary action instead of producing symbolism without return.
+  ;
+  ;   lens       forwarded unchanged to arch-threshold.
+  ;   worker     a one-argument caller macro, applied to the material.
+  ;   verifier   forwarded unchanged to arch-rebirth-cycle.
+  ;   judge      a one-argument 0/1 judge. std/canon's std-binary wraps an
+  ;              ordinary question into that protocol; std/seam's std-gated-by
+  ;              makes the verdict mechanical and free.
+  ;   task       forwarded unchanged to arch-threshold.
+  ;
+  ; Example:
+  ;   (arch-rebirth-work
+  ;     "Judge whether this is a genuine transition."
+  ;     draft
+  ;     std-binary
+  ;     std-binary
+  ;     "Retire the hand-edited release checklist.")
+  ;
+  ; Cost: the accepted path is long and the ordinary fallback is lazy.
+  (~ arch-rebirth-work (lens worker verifier judge task)
+    '(% (,judge (arch-threshold ,lens ,task))
+      (-> (arch-rebirth-cycle ,lens ,worker ,verifier ,task)
+          "Make the return action small enough to run and name its evidence.")
+      (-> (,worker ,task)
+          "Keep the existing arrangement, but state the next observation required before transformation.")))
+)
