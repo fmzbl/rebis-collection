@@ -25,6 +25,13 @@ continuation. Each macro has a commented source example and states its
 evaluation cost. The operator guide in docs/ARCHETYPES.md explains how to
 compose them without treating a prompt as hidden control flow.
 
+The `science` family has two halves. `science/method` is about claims that
+forbid an observation — hypotheses, predictions, falsification, replication.
+`science/evidence` is what you do once the observations are numbers, and every
+judgement in it is arithmetic in the `| |` plane and costs nothing: thresholds,
+nearness to a prediction, effect size, and whether replications agree. It states
+plainly what it cannot do, which is anything needing a variance.
+
 The `forge` family is the coding repair loop: reproduce before diagnosing,
 diagnose before fixing, and let something mechanical decide whether it worked.
 It is also the worked example of how the two layers relate — `std/spiral` is
@@ -42,6 +49,32 @@ than Git commands. Its macros model intent, atomic change slices, durable
 commit stories, adversarial review, semantic integration, conflict recovery,
 release gates, and retrospective learning. See docs/GIT.md for the full API,
 examples, topology, and cost model.
+
+The `source` family is a program that is about itself. `<>` is the program as
+syntax, so a program can explain, criticise, cost, or rewrite what it is — and
+re-enter itself, which is a loop no macro could express. Every protocol asks
+for something a compliment cannot satisfy, and none of them apply a revision:
+`<>` is sight, not authority. See docs/SOURCE.md.
+
+The `wright` family writes the program a task needs. `><` fires a prompt and
+parses the answer as Rebis, and the parsed program runs — so the SHAPE of a
+computation can be decided by the run rather than by whoever wrote the library.
+Every gate is the host, because a model asked whether the program it just wrote
+is good will say yes; and `wright-source` returns text for the cases where a
+program should be read before it costs anything. See docs/WRIGHT.md.
+
+The `conserve` family is about what a chain must not change. `@` holds a rule
+across every arrow in a scope, so a stage that invents a fact, drops a
+constraint, or drifts off the question is caught at the step that did it rather
+than at the end. Every rule asks about a difference between two texts, never
+about quality — and where a mechanical check exists, `std/amend` routes the same
+question to the host for free instead. See docs/CONSERVE.md.
+
+The `numerology` family is a second free deterministic judge. A gematria is a
+pure function from text to a number, so a choice made by one is reproducible
+byte for byte across runs — useful for breaking a tie, sharding an exploration,
+or any pick that must survive a re-run. It claims nothing about the number: the
+gate it is held to is determinism, not accuracy. See docs/NUMEROLOGY.md.
 
 ## Runtime configuration
 

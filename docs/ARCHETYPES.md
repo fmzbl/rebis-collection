@@ -128,7 +128,7 @@ for testing what survives a return to the starting frame.
       std-final-only
       "Draft a one-step rollback procedure.")
 
-Cost: the worker fires twice.
+Cost: the material once, the worker twice.
 
 ### arch-lazy-gate judge accepted rejected value
 
@@ -140,7 +140,9 @@ Runs a binary judge and expands only the selected continuation.
       std-one-word
       "Is this rollout safe to execute?")
 
-Cost: the selected continuation runs once; the unselected one does not run.
+Cost: the material once, the judge once, and only the selected continuation.
+The material is bound before it is judged, so the branch receives exactly what
+the gate ruled on.
 
 ### arch-audit-pair judge worker value
 
@@ -152,7 +154,8 @@ mediator. The judge may be a prompt or a deterministic topic symbol.
       std-with-evidence
       "Review the cache invalidation change.")
 
-Cost: the worker fires twice.
+Cost: the material once, the worker twice. Both readings are of the same
+material, which is what makes their agreement mean anything.
 
 ### arch-evidence-pass lens worker task
 
@@ -358,3 +361,38 @@ budget as needed.
 Source comments are the canonical examples for every macro. They sit directly
 above each definition so that an editor, module browser, or generated catalog
 can show the API and its cost together.
+
+## One subject, several readings
+
+Most figures in this family show one thing from more than one angle: a pair of
+audits, four directions of a mandala, a gate and the branch it selects. That
+only works if every angle is looking at the same thing — and a macro parameter
+is *syntax*, so writing the subject into four positions derived it four times
+and the figure lost its center.
+
+These macros bind the subject with `=` before they fan out:
+
+    (= reading (worker task)
+       (% (judge reading)
+          (field reading reading reading reading)
+          (fallback reading)))
+
+One firing, and a figure that is actually about one subject.
+
+Two exceptions, both deliberate. `arch-mandala-review` splices on purpose: its
+field wants four *independent* readings, and two of its quarters are inverted
+frames. And inversion is why: `^` transforms **syntax**, so `(^ n)` for a bound
+name inverts nothing and silently returns the answer unchanged. Invert the
+expression and bind the result — `(= n (^ (work task)) …)` — never the other way
+around.
+
+## Carrying work between sessions
+
+`arch-integrated subject work` does the work with everything the project already
+knows about the subject, and keeps what came out:
+
+    (arch-integrated the-migration arch-hold-the-tension)
+
+Individuation is the one figure here explicitly about carrying something
+forward, and until a run could keep an answer past its own end it could not be
+expressed — every session re-derived the same integration from nothing.
