@@ -1,0 +1,223 @@
+; science/evidence — the quantitative half of the method.
+;
+; science/method is about claims that forbid an observation. This is about what
+; you do once the observations are numbers: whether a measurement clears a
+; threshold, whether replications agree closely enough to mean anything, and
+; how big the effect actually was as opposed to how confidently it was
+; described.
+;
+; The family exists because the two questions fail in opposite directions. A
+; model asked "is this result significant?" will answer yes, fluently, about
+; noise — the same defect science/method's asymmetry is built around. But a
+; model asked to COMPARE two numbers is unreliable in a plainer way: it is
+; doing arithmetic, badly, at the price of a call. Neither of those is a good
+; way to settle a quantity.
+;
+; So every judgement here is arithmetic in the `| |` plane, and it is FREE. The
+; run counts, compares and reduces without firing anything, and the count
+; cannot be argued with by the work it is judging. What still costs a call is
+; exactly what should: getting a number out of a model in the first place, and
+; writing up what the numbers mean.
+;
+; ── The honest limit ─────────────────────────────────────────────────────────
+;
+; There is no significance test here, and there will not be one until the plane
+; can square. Variance needs each deviation multiplied by itself, and `+` frames
+; — it shifts every quantity in its scope by one amount, which is a translation
+; and not an arbitrary function. What this family offers instead is the spread
+; and the mean absolute deviation, which are in the units of the observations
+; and are harder to misreport. A p-value nobody can recompute from the trace
+; would be worse than no p-value.
+(
+  (# std/sample)
+  (# std/measure)
+  (# std/shape)
+  (# std/seam)
+
+  ; ── getting a quantity at all ───────────────────────────────────────────
+
+  ; (evi-quantify subject measure) — read one number off a subject.
+  ;
+  ;   subject   what is being measured. Interpolated, never fired on its own.
+  ;   measure   what quantity to report, phrased so a bare number is the only
+  ;             sensible answer.
+  ;
+  ; The one crossing that costs anything, and the reason it costs twice: the
+  ; first firing does the reading, the second reshapes it into a bare figure the
+  ; plane can take. A model asked for a number mid-sentence gives you a
+  ; sentence, and `([gematria] …)` would happily turn that sentence into a
+  ; quantity that means nothing.
+  ;
+  ; Everything downstream of this is free. This is the toll.
+  ;
+  ; Example:
+  ;   (evi-quantify (the-report) "How many distinct failures are described?")
+  ;
+  ; Cost: two firings.
+  (~ evi-quantify (subject measure)
+    '(std-one-word ($ ,measure "\n\n" ,subject)))
+
+  ; ── does it clear the bar ───────────────────────────────────────────────
+
+  ; (evi-clears measured floor met missed) — branch on a threshold.
+  ;
+  ;   measured   the quantity.
+  ;   floor      what it has to reach.
+  ;   met        complete expression run at or above it.
+  ;   missed     complete expression run below it.
+  ;
+  ; The gate a yes/no judge cannot express. Asked whether there is evidence, a
+  ; model says yes; asked whether there is ENOUGH, it is not asked at all.
+  ;
+  ; Cost: exactly one branch. The comparison is free.
+  (~ evi-clears (measured floor met missed)
+    '(% (std-at-least ,measured ,floor) ,met ,missed))
+
+  ; (evi-as-predicted measured predicted tolerance held broke) — did the
+  ; measurement land where the claim said it would?
+  ;
+  ;   measured    what was observed.
+  ;   predicted   what the claim required.
+  ;   tolerance   how far off still counts as agreement. State it BEFORE
+  ;               measuring; a tolerance chosen afterwards is not a test.
+  ;   held        complete expression run when the prediction survived.
+  ;   broke       complete expression run when it did not.
+  ;
+  ; science/method's `sci-falsify` asks a model whether a prediction survived.
+  ; Where the prediction is numeric, this settles it mechanically — and it is
+  ; the nearer question: not above or below, but CLOSE, which a single
+  ; threshold cannot express.
+  ;
+  ; Example:
+  ;   (evi-as-predicted latency 200 20 (write-it-up) (revise-the-claim))
+  ;
+  ; Cost: exactly one branch.
+  (~ evi-as-predicted (measured predicted tolerance held broke)
+    '(% (std-within ,measured ,predicted ,tolerance) ,held ,broke))
+
+  ; ── how big was it, really ──────────────────────────────────────────────
+
+  ; (evi-effect before after) — the change, unsigned.
+  ;
+  ; The number a write-up should lead with and usually buries. Report it beside
+  ; the baseline: a change of 3 means nothing until someone knows whether the
+  ; baseline was 4 or 400.
+  ;
+  ; Cost: nothing.
+  (~ evi-effect (before after) '(std-gap ,before ,after))
+
+  ; (evi-relative-effect before after) — the change as a share of the baseline.
+  ;
+  ; Exact, so a third stays a third rather than becoming 0.333. Hand it to
+  ; std-percent where a report wants a plainer figure.
+  ;
+  ; Cost: nothing.
+  (~ evi-relative-effect (before after)
+    '(std-portion (std-gap ,before ,after) ,before))
+
+  ; (evi-worth-reporting before after floor big small) — is the effect large
+  ; enough to be worth a paragraph?
+  ;
+  ;   floor   the smallest relative change that matters, as a share — `1/10`
+  ;           for ten percent. Choose it from what the change is FOR, not from
+  ;           what the measurement produced.
+  ;
+  ; The guard against a run that reports every difference it can measure. A
+  ; model has no way to know which differences matter and will describe a two
+  ; percent shift as substantial if asked to describe it.
+  ;
+  ; Cost: exactly one branch.
+  (~ evi-worth-reporting (before after floor big small)
+    '(% (std-at-least (evi-relative-effect ,before ,after) ,floor) ,big ,small))
+
+  ; ── do the replications agree ───────────────────────────────────────────
+
+  ; (evi-consistent low high tolerance agreed scattered) — branch on how far
+  ; apart independent measurements fell.
+  ;
+  ;   low high    the extremes. Take them with `([min] …)` and `([max] …)` over
+  ;               the replications, which accept as many branches as you have.
+  ;   tolerance   the widest spread that still counts as agreement.
+  ;
+  ; `sci-replicate` gets independent derivations of one result; this asks
+  ; whether the numbers they produced actually agree. Three runs that agree
+  ; within a point are a finding. Three that scatter across the whole range are
+  ; also a finding — about the measurement — and averaging them would hide it.
+  ;
+  ; Example:
+  ;   (evi-consistent |([min] a b c)| |([max] a b c)| 2 (report-it) (chase-it))
+  ;
+  ; Cost: exactly one branch.
+  (~ evi-consistent (low high tolerance agreed scattered)
+    '(% (std-under (std-spread ,low ,high) ,tolerance) ,agreed ,scattered))
+
+  ; (evi-central total size) — the middle of the replications.
+  ;
+  ;   total   the sum. Fold at the call site with `([sum] …)`.
+  ;   size    how many, with `([count] …)` over the same branches.
+  ;
+  ; Nothing here is arity-locked, because the fold is written where the
+  ; mediator is. Add a fourth replication and only the two mediator lines
+  ; change.
+  ;
+  ; Cost: nothing.
+  (~ evi-central (total size) '(std-mean ,total ,size))
+
+  ; (evi-scatter total size) — the mean absolute deviation.
+  ;
+  ;   total   the sum of the per-replication deviations from the centre, folded
+  ;           at the call site with std-deviation.
+  ;   size    how many.
+  ;
+  ; Not a standard deviation. This plane can average distances and cannot square
+  ; them, and the figure it can produce is in the units of the observations
+  ; rather than their squares — which is the one a reader can check against the
+  ; raw numbers in the trace.
+  ;
+  ; Cost: nothing.
+  (~ evi-scatter (total size) '(std-typical-gap ,total ,size))
+
+  ; ── the write-up ────────────────────────────────────────────────────────
+
+  ; (evi-report subject centre scatter effect) — state the result with its
+  ; numbers attached.
+  ;
+  ;   subject   what was measured. Interpolated.
+  ;   centre    the central value.
+  ;   scatter   how much the replications moved.
+  ;   effect    the size of the change.
+  ;
+  ; The numbers are interpolated into the prompt rather than described to the
+  ; model, so the write-up cannot disagree with the measurements — it is being
+  ; handed them. This is the crossing back out of the plane, and it costs
+  ; nothing: the figures were computed free and arrive as text.
+  ;
+  ; Cost: one firing.
+  (~ evi-report (subject centre scatter effect)
+    '($ "Report this result. Use exactly these figures and do not restate them "
+        "as adjectives: central value " ,centre ", typical spread across "
+        "replications " ,scatter ", size of the effect " ,effect
+        ". Say plainly what the spread implies about how much weight the "
+        "central value carries.\n\n" ,subject))
+
+  ; (evi-settled subject centre scatter effect tolerance floor) — the whole
+  ; protocol: measure, check the replications agree, check the effect is worth
+  ; reporting, then write it up.
+  ;
+  ; The order matters and is the point. A result whose replications scattered
+  ; is not made publishable by a large effect, and a tight result whose effect
+  ; is negligible is not made interesting by being tight. Both gates run before
+  ; anything is written, and each failure says which one it was.
+  ;
+  ; Cost: one firing when both gates pass, one when either fails.
+  (~ evi-settled (subject centre scatter effect tolerance floor)
+    '(% (std-under ,scatter ,tolerance)
+        (% (std-at-least ,effect ,floor)
+           (evi-report ,subject ,centre ,scatter ,effect)
+           ($ "State that the effect was too small to report: it measured "
+              ,effect " against a floor of " ,floor
+              ". Do not argue for it anyway.\n\n" ,subject))
+        ($ "State that this did not replicate: the typical spread was "
+           ,scatter " against a tolerance of " ,tolerance
+           ". Say what would have to be controlled before measuring "
+           "again.\n\n" ,subject))))

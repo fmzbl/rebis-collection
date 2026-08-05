@@ -1,0 +1,135 @@
+; wright/program — writing the program the task actually needs.
+;
+; std/meta supplies the structure and phrases nothing. This is the other half:
+; the wordings that make a model write Rebis rather than prose about Rebis.
+;
+; That is the whole difficulty. A model asked for a program returns an
+; explanation with a program in it, wrapped in fences, prefaced by "Sure!".
+; Rebis has an unusual syntax and almost no training data, so every prompt here
+; spends most of its words on the same three instructions — only source, no
+; fences, no commentary — and the runtime still reports a parse failure rather
+; than guessing. `GeneratedSyntax` carries what was written, so a generator
+; that produces prose is visible instead of silently doing nothing.
+;
+; The discipline: never let a written program be judged by the model that wrote
+; it. Every gate here is a host port. A model asked whether the program it just
+; produced is good will say yes.
+;
+; And the boundary this family does not cross: `><` runs what it writes. A
+; program that must be READ before it costs anything is not written with `><`
+; at all — ask for source with an ordinary prompt, which is text, and hand it
+; to a host. git/pr-review's pr-program is that shape, deliberately.
+(
+  (# std/meta)
+  (# std/seam)
+  (# std/imaginary)
+
+  ; (wright-source description) — the phrasing, without the running.
+  ;
+  ;   description   what the program should do, in the caller's words.
+  ;                 Interpolated, never fired.
+  ;
+  ; Returns Rebis source AS TEXT: an ordinary prompt, so its answer flows
+  ; through arrows and out through ports like any other. This is the form to
+  ; use when a program should be reviewed, saved, or handed to a host before
+  ; anything is spent on it.
+  ;
+  ; Cost: one call.
+  (~ wright-source (description)
+    '(-> ,description
+         "Write a Rebis program that does this. Rebis: a quoted string is a prompt that fires a model; (-> a b) routes each answer into the next stage as INPUT; ([m] a b) runs branches and lets mediator m combine them; (% c a b) picks one branch from a condition answering exactly 0 or 1; (= n v body) names one answer. Reply with ONLY the program. No explanation, no code fences, no preamble. If the task cannot be expressed as a program, reply with exactly: nothing"))
+
+  ; (wright-run description) — write the program and run it, privately.
+  ;
+  ;   description   as above.
+  ;
+  ; The generated program's steps stay inside a space, so what the run
+  ; remembers is what the whole thing answered and not the working of something
+  ; nobody wrote. Reach for this before reaching for the bare `><`.
+  ;
+  ; Example:
+  ;   (wright-run "summarise each incident and rank them by blast radius")
+  ;
+  ; Cost: one call to write, plus whatever the written program costs — and that
+  ; second part cannot be read off the page.
+  (~ wright-run (description)
+    '(std-drafted
+       ($ "Write a Rebis program that does this, and nothing else: "
+          ,description
+          ". A quoted string is a prompt; (-> a b) feeds a's answer to b; "
+          "([m] a b) mediates branches; (% c a b) picks a branch from an exact "
+          "0 or 1. Reply with ONLY the program — no explanation, no fences.")))
+
+  ; (wright-vetted description shipped discarded) — the host judges the result.
+  ;
+  ;   description   as above.
+  ;   shipped       complete expression run when the host delivers 1.
+  ;   discarded     complete expression run when the host delivers 0.
+  ;
+  ; A written program cannot be vetted before it runs, so what is judged is
+  ; what it produced — and by the host, through the seam port, at no cost and
+  ; with no way for the answer to argue with the verdict.
+  ;
+  ; Cost: the write, the run, then one branch. The verdict is free.
+  (~ wright-vetted (description shipped discarded)
+    '(std-vetted
+       ($ "Write a Rebis program that does this, and nothing else: "
+          ,description
+          ". Reply with ONLY the program — no explanation, no fences.")
+       ,shipped
+       ,discarded))
+
+  ; (wright-specialised task) — a program written FOR this input, then run
+  ; on it.
+  ;
+  ;   task   the input. Bound once, so the program that gets written and the
+  ;          input it is run on are the same thing — spliced instead, the
+  ;          description and the work would be two different readings of it.
+  ;
+  ; The case `><` exists for, and the one no fixed macro can express: the SHAPE
+  ; of the computation is decided by the run rather than by whoever wrote the
+  ; library. A task that wants three independent readings gets a square; one
+  ; that wants a chain gets arrows.
+  ;
+  ; Example:
+  ;   (wright-specialised (&: "./incident.md"))
+  ;
+  ; Cost: the task once, one write, and whatever was written.
+  (~ wright-specialised (task)
+    '(= subject ,task
+        (std-drafted
+          ($ "Here is a task. Write the Rebis program best shaped to do it — "
+             "arrows where a stage needs the previous answer, a square where "
+             "readings should stay independent until a mediator sees them, a "
+             "gate where a decision picks one path. Put the task itself into "
+             "the prompts you write. Reply with ONLY the program, no fences. "
+             "The task: " subject))))
+
+  ; (wright-until-accepted description) — write, run, and rewrite until the
+  ; host takes it.
+  ;
+  ;   description   as above, and fired once per attempt.
+  ;
+  ; The loop. Each attempt runs inside a space and marks what it produced to
+  ; the imaginary plane, so the next attempt can read what the last one did
+  ; without that becoming something the run remembers. The gate is the host,
+  ; for the reason every gate here is the host.
+  ;
+  ; A host that never accepts has written an unbounded program; the expansion
+  ; budget is the backstop, not the design.
+  ;
+  ; Cost: per attempt, one write and one run. The verdict is free.
+  (~ wright-until-accepted (description)
+    '(std-rewritten
+       wright-approved
+       ($ "Write a Rebis program that does this, and nothing else: "
+          ,description
+          ". Earlier attempts already produced: " (? ,description)
+          ". Do better than they did. Reply with ONLY the program, no fences.")))
+
+  ; (wright-approved made) — the gate the loop uses: the host, not a model.
+  ;
+  ;   made   what an attempt produced. Sent out; the host answers 0 or 1.
+  ;
+  ; Cost: nothing. The port is free.
+  (~ wright-approved (made) '(std-received ,made)))

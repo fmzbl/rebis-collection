@@ -14,6 +14,7 @@
   (# std/committee)
   (# std/dialectic)
   (# std/loops)
+  (# std/memory)
   (# std/shape)
 
   ; (arch-encounter lens worker task) — make an attempt, inspect its excluded
@@ -165,4 +166,24 @@
   ; the panel through the standard arrow topology.
   (~ arch-individuation-panel (mediator chair first second third task)
     '(std-chaired-panel ,chair ,mediator ,first ,second ,third ,task))
+
+  ; (arch-integrated subject work) — do the work with everything the project
+  ; already knows about the subject, and keep what integration produced.
+  ;
+  ;   subject   the theme, recalled before the work and kept under after it.
+  ;   work      a one-argument caller macro.
+  ;
+  ; Individuation is the one figure in this family that is explicitly about
+  ; carrying something forward rather than resolving it in place, and until a
+  ; run could keep an answer past its own end there was no way to express that:
+  ; every session started from nothing and re-derived the same integration. This
+  ; makes the work cumulative — a later run recalls what was integrated rather
+  ; than integrating it again.
+  ;
+  ; Cost: one call. The recall and the keeping are both free.
+  ;
+  ; Example:
+  ;   (arch-integrated the-migration arch-hold-the-tension)
+  (~ arch-integrated (subject work)
+    '(! (std-grounded ,subject ,work)))
 )

@@ -15,6 +15,7 @@
   (# std/reflexion)
   (# std/search)
   (# std/shape)
+  (# std/imaginary)
 
   ; (arch-shadow-scan lens work) — make three evidence-bound counter-readings:
   ; exclusion, contradiction, and consequence.
@@ -60,6 +61,36 @@
          (arch-shadow-scan ,lens (,worker ,task))
          (-> (,worker ,task)
              "Revise the attempt in response to the counter-reading. Preserve the useful constraint, and make one change that can be tested.")))
+
+  ; (arch-shadow-met lens work) — make contact with the excluded material and
+  ; keep what changed, not the accusation.
+  ;
+  ;   lens   forwarded to arch-shadow-scan, inside the space.
+  ;   work   the material. Bound once, so the scan and the integration read the
+  ;          SAME attempt rather than deriving two.
+  ;
+  ; arch-shadow-scan produces three evidence-bound counter-readings, and they
+  ; are the most quotable text a shadow protocol generates: specific, adverse,
+  ; and phrased in the work's own vocabulary. Left in the record they outrank
+  ; the integration at every later recall, so a run that did shadow work and
+  ; then revised remembers mainly the indictment.
+  ;
+  ; The contact still happens in full. What crosses out is the integration —
+  ; the changed design, the preserved constraint, the verification step —
+  ; which is the only part that was ever meant to be carried forward. Material
+  ; is not integrated by being repeated.
+  ;
+  ; Example:
+  ;   (arch-shadow-met
+  ;     "Find omitted operational evidence."
+  ;     "The queue design assumes workers never stall.")
+  ;
+  ; Cost: the work once, three counter-readings, one integration. The space is
+  ; free.
+  (~ arch-shadow-met (lens work)
+    '{(= material ,work
+         (-> (arch-shadow-scan ,lens material)
+             "Integrate this counter-reading into the work: state the one changed design, the one constraint worth preserving, and the one verification step that would show the change landed. Do not restate the criticism."))})
 
   ; (arch-shadow-integration lens reconcile work) — use a dialectical std-synthesis
   ; to hold the original account, the counter-reading, and an operational

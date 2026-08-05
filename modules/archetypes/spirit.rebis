@@ -11,6 +11,7 @@
   (# std/debate)
   (# std/dialectic)
   (# std/reflexion)
+  (# std/search)
   (# std/shape)
 
   ; (arch-spirit-question lens task) — generate an organizing question, provisional

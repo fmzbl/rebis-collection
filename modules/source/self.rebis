@@ -1,0 +1,187 @@
+; source/self — a program that is about itself.
+;
+; `<>` is the program, as syntax. std/source supplies the structure and phrases
+; nothing; this module is the other half — the wordings that make those shapes
+; a self-examination, and the wiring that hands them over.
+;
+; The discipline is the one that keeps self-reference from being flattery. A
+; model asked to review its own program will call it well-structured. So every
+; protocol here either asks for something a compliment cannot satisfy — a
+; specific line, a named failure, a rewritten form — or hands the verdict to
+; something that is not the model.
+;
+; ── How `<>` is read here, and why it matters ───────────────────────────────
+;
+; Every macro below puts `<>` in an INTERPOLATION, never in a position that
+; runs it — not an arrow's input, and not a square's branch.
+; The difference is not stylistic. `(-> <> "describe it")` RUNS the program and
+; feeds its answer onward — and since the program contains the macro, it runs
+; itself again, and again, until the runtime stops it. Measured before the fix:
+; forty-seven model calls and no answer, where the macro documents one call.
+;
+; `($ "describe it" <>)` reads the program's text and fires once, which is what
+; every macro here means and what each of their Cost lines claims. Reading is
+; free; running is not.
+;
+; What none of these can do is APPLY a revision. `<>` is sight, not authority:
+; a proposal comes back as text, and a person or a host decides. That boundary
+; is deliberate and is not a limitation to be worked around here.
+(
+  (# std/source)
+  (# std/seam)
+  (# std/shape)
+  (# std/imaginary)
+
+  ; (self-explain) — what does this program do?
+  ;
+  ; The plainest use, and the one worth having before the others: a reader who
+  ; cannot say what a program does cannot say whether it is wrong.
+  ;
+  ; Cost: one call.
+  (~ self-explain ()
+    '($ "This is a Rebis program. Say what it does, in one paragraph, in terms of what it will actually cause to happen: which prompts fire, in what order, what flows between them, and what it finally answers. Do not describe the language, and do not praise the design.\n\n"
+        <>))
+
+  ; (self-weakness) — the one thing most likely to be wrong.
+  ;
+  ; Asks for a location, not a judgement. A model asked whether a program is
+  ; good says yes; a model asked which form is the weakest has to point.
+  ;
+  ; Cost: one call.
+  (~ self-weakness ()
+    '($ "This is a Rebis program. Name the ONE form in it most likely to produce a wrong or useless answer, quote that form exactly, and say what it would do wrong. If you cannot find one, say so plainly rather than inventing a criticism.\n\n"
+        <>))
+
+  ; (self-cost) — what will running this actually spend?
+  ;
+  ; Rebis makes cost readable off the page — one written prompt is one firing,
+  ; a `$` is free, a `%` expands one branch — so this is a question with a
+  ; checkable answer, which is exactly what makes it worth asking of a model.
+  ;
+  ; Cost: one call.
+  (~ self-cost ()
+    '($ "This is a Rebis program. Count the model calls one run of it makes, as a number or a range if a gate decides it. List each firing form and why it fires. A quoted prompt fires; `$`, `?`, `!`, `<>` and `{}` do not; `%` expands exactly one branch.\n\n"
+        <>))
+
+  ; (self-revise instruction) — propose a changed version of this program.
+  ;
+  ;   instruction   what to change, in the caller's words. Interpolated, never
+  ;                 fired, so it costs nothing to say.
+  ;
+  ; Returns SOURCE, and returning it is all it does. Nothing here writes a
+  ; file or replaces a running program: `<>` is sight, and applying a revision
+  ; needs the isolated bridge and the validation that only a host has.
+  ;
+  ; Example:
+  ;   (self-revise "make the verdict mechanical instead of asking a model")
+  ;
+  ; Cost: one call.
+  (~ self-revise (instruction)
+    '($ "This is a Rebis program. Rewrite it to satisfy this instruction: "
+        ,instruction
+        ". Reply with the complete new program as Rebis source and nothing else — no explanation, no fences. Change as little as the instruction requires.\n\n"
+        <>))
+
+  ; (self-improved judge) — find the weakness, fix that, keep only the fix.
+  ;
+  ;   judge   mediator over the weakness and the program, deciding what the
+  ;           revision should be. A prompt mediator costs one call.
+  ;
+  ; The assembled loop, and the reason the imaginary space is imported: the
+  ; criticism is scaffolding. Left in the record it is a detailed, quotable
+  ; account of what is wrong with a program that has since been changed, and
+  ; every later recall on the subject ranks it against the revision. The
+  ; critique happens in full and is forgotten; the proposal crosses out.
+  ;
+  ; Cost: the weakness once, the mediation once. The space is free.
+  (~ self-improved (judge)
+    '{([,judge]
+       (self-weakness)
+       ($ <>))})
+
+  ; (self-until-accepted work) — revise until a host says stop.
+  ;
+  ;   work   what each pass produces and the host judges. Fires once per pass.
+  ;
+  ; std/source's std-until with the one gate worth using here. A model asked
+  ; whether its own program is finished says yes, and a loop over the whole
+  ; program is exactly the loop where that answer must not be trusted — so the
+  ; verdict leaves the program through the seam port and costs no call.
+  ;
+  ; The host answers 1 to stop. A host that never does has written an
+  ; unbounded program, and the expansion budget is the backstop.
+  ;
+  ; The work is BOUND before the gate. std-gated-by fires its own first
+  ; argument inside the condition, so handing it the work twice would draft
+  ; twice per pass and gate one draft while returning the other — the same
+  ; confound `=` exists to remove.
+  ;
+  ; Example:
+  ;   (self-until-accepted (draft-the-section))
+  ;
+  ; Cost: per pass, the work once; the verdict is free.
+  (~ self-until-accepted (work)
+    '(= drafted ,work
+        (std-gated-by drafted drafted <>)))
+
+  ; (self-attempted subject) — try a rewrite privately, keep only the lesson.
+  ;
+  ;   subject   what the program is being improved AT, and the topic the
+  ;             lessons accumulate under. Interpolated, never fired.
+  ;
+  ; One turn of the ratchet. The program writes a new version of itself and
+  ; RUNS it; whatever that produces is marked to the imaginary plane and the
+  ; boundary crosses nothing — so the record is untouched and the next attempt
+  ; can still read what this one found out.
+  ;
+  ; Note what does NOT move: `<>` is the run's own program, so every attempt
+  ; begins from the same reviewed base rather than from an unreviewed
+  ; descendant of the last one. What accumulates is the LESSON, not the
+  ; mutation. That is the difference between hill-climbing with memory and a
+  ; chain of edits nobody looked at, and it is why self-improvement here needs
+  ; no rebinding of what the program is.
+  ;
+  ; Example:
+  ;   (self-attempted "summarising incident reports")
+  ;
+  ; Cost: one call to write the new version, plus whatever running it costs.
+  ; The mark and both boundaries are free.
+  (~ self-attempted (subject)
+    '(std-noted
+       (>< ($ "You are rewriting a Rebis program so that it does better at: "
+              ,subject
+              ". Earlier attempts already established: " (? ,subject)
+              ". Do not repeat what they ruled out. Reply with ONLY the "
+              "complete Rebis program, no prose and no fences. The program is: "
+              <>))))
+
+  ; (self-climbed subject work) — attempt twice, then do the real work.
+  ;
+  ;   subject   forwarded to both attempts, and the topic they share.
+  ;   work      what the program is actually for. Runs last, in the open, so
+  ;             its answer IS the run's answer and its evidence is real.
+  ;
+  ; The assembled shape. Two rehearsals of a better self, neither remembered,
+  ; each informed by the last — and then the work, done once, by a program that
+  ; has already found out two ways not to do it.
+  ;
+  ; Two attempts rather than a loop on purpose: a self-rewriting loop with a
+  ; model for a stop condition does not terminate on any principle. For a real
+  ; loop use std/source's std-until with a mechanical gate, and read
+  ; docs/SOURCE.md first.
+  ;
+  ; Cost: two writes, two runs of what was written, and the work.
+  (~ self-climbed (subject work)
+    '((self-attempted ,subject)
+      (self-attempted ,subject)
+      ,work))
+
+  ; (self-recorded) — write down what this program is, durably.
+  ;
+  ; A program explains itself and the explanation outlives the run, so a later
+  ; run's flashback on the subject recalls what the program was rather than
+  ; re-deriving it. Keeping is free; the explanation is the one call.
+  ;
+  ; Cost: one call.
+  (~ self-recorded ()
+    '(! (std-with-evidence (self-explain)))))

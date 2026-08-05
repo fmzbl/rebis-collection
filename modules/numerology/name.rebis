@@ -1,0 +1,94 @@
+; numerology/name — choosing the same way twice, for nothing.
+;
+; A gematria is a deterministic function from text to a number: letters become
+; figures, the figures are summed, the sum is reduced. It is the oldest such
+; reading there is and mechanically it is an ordinary hash — which is exactly
+; what makes it useful here, and exactly the limit of what it can claim.
+;
+; What it gives a program: a free, reproducible choice. Rebis already has one
+; free deterministic judge, the symbol mediator that scores by holonomy. This
+; is a second, on a different measure and in the same slot. Where a run must
+; pick and nothing about the pick needs to be RIGHT — a tie to break, an
+; exploration to shard, a selection that must survive a re-run byte for byte —
+; a model call buys nothing and a reading costs nothing.
+;
+; What it does not give: any claim that the number means something. The
+; collection says this about Jung and it is truer here — these are composition
+; tools, not diagnostic tests. A route chosen by a name is reproducible, not
+; correct, and every macro below is written so nothing else could be inferred.
+;
+; The gate this family is held to is therefore not accuracy but DETERMINISM:
+; same text, same figure, same branch, forever. That is testable, and it is the
+; whole of what is promised.
+(
+  (# std/measure)
+
+  ; (name-value text) — the figure a text reduces to.
+  ;
+  ;   text   any text. Interpolated, never fired.
+  ;
+  ; Letters are counted, the sum is taken to a single figure, and case and
+  ; punctuation change nothing — so the same subject written two ways reads the
+  ; same, which is the only property anything here depends on.
+  ;
+  ; Example:
+  ;   (name-value the-retry-queue)
+  ;
+  ; Cost: nothing.
+  (~ name-value (text) '(std-root (std-weight ,text)))
+
+  ; (name-shares a b) — do two texts reduce alike?
+  ;
+  ;   a b   texts. Interpolated, never fired.
+  ;
+  ; Answers 0 or 1, which is what `%` reads — so a reduction can steer an
+  ; ordinary program with no control flow added anywhere.
+  ;
+  ; Cost: nothing.
+  (~ name-shares (a b)
+    '(std-equal (name-value ,a) (name-value ,b)))
+
+  ; (name-splits text left right) — send a subject one way or the other, the
+  ; same way every time.
+  ;
+  ;   text    the subject deciding. Interpolated, never fired.
+  ;   left    complete expression, taken by an even figure.
+  ;   right   complete expression, taken by an odd figure.
+  ;
+  ; A deterministic two-way shard. Which side a subject lands on is arbitrary;
+  ; that it lands on the same side every run is the point, and is the only
+  ; thing that should ever be relied on.
+  ;
+  ; Example:
+  ;   (name-splits the-subject (read-it-closely) (read-it-broadly))
+  ;
+  ; Cost: exactly one branch. The reduction is free.
+  (~ name-splits (text left right)
+    '(% |(/ 2 (name-value ,text))| ,right ,left))
+
+  ; (name-breaks-tie a b text) — pick between two equals, reproducibly.
+  ;
+  ;   a b    complete expressions, taken by an even and an odd figure.
+  ;   text   what decides. Interpolated, never fired.
+  ;
+  ; The honest use, and the one worth having. When two options have been judged
+  ; and neither won, something must still choose — and a model asked again
+  ; gives a different answer than it gave the first time, which makes the run
+  ; unrepeatable for no gain. This chooses badly but identically, which is
+  ; strictly better than choosing badly and differently.
+  ;
+  ; Cost: exactly one branch.
+  (~ name-breaks-tie (a b text) '(name-splits ,text ,a ,b))
+
+  ; (name-numbered text work) — hand a worker the subject and its figure.
+  ;
+  ;   text   the subject. Interpolated into the framing, never fired.
+  ;   work   complete expression. Every prompt inside sees both.
+  ;
+  ; For the case where the figure belongs in the prompt rather than in the
+  ; control flow — a framing, not a decision. `+` reaches every prompt in the
+  ; body, and the reduction it carries cost nothing to compute.
+  ;
+  ; Cost: exactly what work costs.
+  (~ name-numbered (text work)
+    '(+ ($ ,text " reduces to " (name-value ,text) ".") ,work)))

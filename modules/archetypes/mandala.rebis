@@ -153,18 +153,24 @@
   ;     draft
   ;     "Design the service boundary for the migration.")
   ;
-  ; Cost: worker is intentionally reused four times, plus a judge and final
-  ; std-synthesis. This is a broad field std-audit, not a cheap prompt wrapper.
+  ; Cost: one worker firing, one judge, four directional readings, and the
+  ; final std-synthesis.
+  ;
+  ; The worker's reading is BOUND, and that is what makes this a mandala. Each
+  ; direction used to derive the reading again, so the four quarters read four
+  ; different drafts and the judge ruled on a fifth — a figure with no center at
+  ; all. One center, four directions around it, is the whole shape.
   (~ arch-mandala-work (center mediator judge worker task)
-    '(% (,judge (,worker ,task))
-      (-> (arch-center-and-field ,center ,mediator
-             (-> (,worker ,task) "Read the task from reliability.")
-             (-> (,worker ,task) "Read the task from delivery speed.")
-             (-> (,worker ,task) "Read the task from user clarity.")
-             (arch-invert-frame arch-trickster-opposite (,worker ,task)))
-          "Return the centered design, the four directions, and the smallest test that could disprove the center.")
-      (-> (,worker ,task)
-          "Return the current design and one missing direction to investigate before synthesis.")))
+    '(= reading (,worker ,task)
+        (% (,judge reading)
+           (-> (arch-center-and-field ,center ,mediator
+                  (-> reading "Read the task from reliability.")
+                  (-> reading "Read the task from delivery speed.")
+                  (-> reading "Read the task from user clarity.")
+                  (arch-invert-frame arch-trickster-opposite reading))
+               "Return the centered design, the four directions, and the smallest test that could disprove the center.")
+           (-> reading
+               "Return the current design and one missing direction to investigate before synthesis."))))
 
   ; (arch-field-input center mediator) — receive a host-supplied task and build a
   ; four-direction field from it. This is useful for Kaos input chaining.
@@ -180,7 +186,7 @@
   ; Cost: the input is reused across all four directions; no model call is
   ; made to receive the host value.
   (~ arch-field-input (center mediator)
-    '(& input
+    '(= input (&)
       (arch-center-and-field ,center ,mediator
         input
         (arch-invert-frame arch-trickster-opposite input)

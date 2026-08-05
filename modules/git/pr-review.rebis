@@ -1,0 +1,290 @@
+; git/pr-review — answering a pull request as a bounded conversation.
+;
+; A review is not one question. It is: read what was proposed, read what people
+; said about it, decide which remarks want an answer and which want a change,
+; agree that plan with a human, do the work, and agree the result with the same
+; human. Two of those steps are decisions no model may make for itself, and both
+; are written here as host ports rather than as judge prompts — the reviewer is
+; the one who says whether the plan is right, and the one who says whether the
+; change is done.
+;
+; The two agreement loops are the shape of the module. `pr-settled` runs a piece
+; of work, shows it to the host, and takes an exact 0 or 1 back. On 1 the answer
+; stands. On 0 the host's own words become the revision instruction and the loop
+; goes round again. There is no iteration count and no model-side "are we done
+; yet": termination is the reviewer clicking accept, and the runtime's budgets
+; are the backstop if nobody ever does.
+;
+; The plan is executed by writing a Rebis program and handing it back to the
+; host to run as a nested run — see `pr-program`. That is the recursion this
+; module is built around: a review that finds five threads writes a program with
+; five stages, each of which may itself open a run. The host is responsible for
+; running it and reporting back; the program is responsible for being explicit
+; enough that running it is mechanical.
+;
+; Fetching is likewise the host's job. `pr-fetched` takes the reference through
+; the port and asks for the pull request to be brought in with whatever tool the
+; host has — `gh`, a browser, a checkout. Nothing here shells out; the module
+; states what it needs and lets the runtime decide how.
+;
+; Cost note before the API: every macro states its own, but the shape of the
+; whole is one fetch, four independent readings of the thread, one mediation,
+; one plan, one program, and then two host-bounded loops. A review of a quiet
+; pull request is a handful of calls. A contested one is however many rounds the
+; reviewer asks for.
+;
+; The module routes itself. Judgement — reading a thread for what it is really
+; asking, writing the plan, writing the program that carries it out — is bound
+; to Opus 5. Clerical work — issuing the fetch directive, folding one objection
+; back into a plan, restating what is outstanding — is bound to Haiku. The
+; binding is written on the DEFINITION, so every call to that macro is routed
+; whatever site calls it, and a caller that wants something else can still
+; override its own subtree with a nearer `/`. Callers who want the whole review
+; on one model write `(pr-review)/their-model` and the outer binding is what an
+; unbound stage inherits; the stages bound here keep their own.
+(
+  (# std/assurance)
+  (# std/canon)
+  (# std/committee)
+  (# std/seam)
+  (# std/shape)
+
+  ; (pr-fetched follow) — take a pull request reference from the host and bring
+  ; the pull request in before anything reads it.
+  ;
+  ;   follow   a one-argument caller macro receiving the fetched pull request.
+  ;
+  ; The reference arrives through the port, so it is whatever the host sends:
+  ; a URL, an `owner/repo#number`, or a branch. The fetch itself is a directive
+  ; to the executing agent rather than a command this module runs, because the
+  ; module cannot know whether the host has `gh`, a browser, or a working copy.
+  ; If the agent has no way to reach the pull request it must say so plainly
+  ; rather than describe one it has not read — that refusal is more useful than
+  ; a confident summary of nothing.
+  ;
+  ; Cost: one port (free), one fetch call, plus whatever `follow` costs.
+  ;
+  ; Example:
+  ;   (pr-fetched pr-plan)
+  (~ pr-fetched (follow)
+    '(/ claude:haiku
+       (= seam (&)
+       (,follow
+         (-> seam
+           ($ "Fetch this pull request in full: its title, description, "
+              "the complete diff, and every review comment with its file, "
+              "line, author, and thread position. Use whatever tool you have "
+              "for reaching it. If you cannot reach it, say exactly that and "
+              "stop — do not describe a pull request you have not read."))))))
+
+  ; (pr-threads pr) — read the comments as threads, not as a list.
+  ;
+  ;   pr   the fetched pull request. Read four times, independently.
+  ;
+  ; Four readers look at the same thread and are reconciled by a mediator. The
+  ; repetition is the point: reviewers disagree about what a remark is asking
+  ; for, and averaging that disagreement away before the plan is written is how
+  ; a review ends up answering a question nobody asked. Each reading is told to
+  ; separate what wants an ANSWER from what wants a CHANGE, because those are
+  ; different obligations and conflating them is the usual failure.
+  ;
+  ; Cost: four readings of `pr`, one mediation.
+  ;
+  ; Example:
+  ;   (pr-threads the-pull-request)
+  (~ pr-threads (pr)
+    (/ claude:opus5
+       (std-reconciled
+      (-> pr
+        ($ "Group every review comment into threads. For each thread state: "
+           "who raised it, what file and line it concerns, what it is asking "
+           "for, and whether it wants an ANSWER, a CHANGE, or both. Quote the "
+           "comment. Mark anything already resolved by a later commit."))
+      (-> pr
+        ($ "Read the review comments adversarially. Which remarks are asking "
+           "for something the diff does not do? Which are questions the author "
+           "has not answered? Which are objections dressed as questions? State "
+           "each with its file, line, and the obligation it creates.")))))
+
+  ; (pr-plan pr) — the analysis and the todo list, in one document.
+  ;
+  ;   pr   the fetched pull request.
+  ;
+  ; The plan is deliberately two lists rather than one. Comments needing an
+  ; answer and changes needing to be made have different completion conditions:
+  ; one is done when a reply is posted, the other when the diff changes. A
+  ; single "todo" column hides that, and a review that hides it tends to reply
+  ; to everything and change nothing.
+  ;
+  ; Cost: `pr-threads` (four readings and a mediation), then one plan call.
+  ;
+  ; Example:
+  ;   (pr-plan the-pull-request)
+  (~ pr-plan (pr)
+    (/ claude:opus5
+       (std-with-evidence
+      (-> (pr-threads pr)
+        ($ "Write the review plan as two numbered lists and nothing else.\n\n"
+           "ANSWERS — comments that need a reply. For each: the thread, the "
+           "question as asked, and the answer to post.\n\n"
+           "CHANGES — work the comments require. For each: the file, what to "
+           "change, and how anyone will know it is done.\n\n"
+           "Put anything you judge out of scope in a third list called "
+           "DECLINED, with the reason. An empty list is a valid answer; say "
+           "so explicitly rather than inventing entries to fill it.")))))
+
+  ; (pr-settled work revise) — hold a result open until the host accepts it.
+  ;
+  ;   work     the working whose result is being agreed. Fires once per round.
+  ;   revise   a one-argument caller macro receiving the host's own words as
+  ;            the revision instruction.
+  ;
+  ; The decision is a port, so it is an exact 0 or 1 from outside the program.
+  ; No judge prompt, no model call for the verdict, and nothing a persuasive
+  ; answer can do about it. Anything other than 0 or 1 raises InvalidCondition
+  ; and runs neither branch.
+  ;
+  ; On rejection the loop does NOT simply retry: the host's message is passed to
+  ; `revise` as the instruction, so a second round is directed rather than a
+  ; second guess. This is the only loop in the module and both agreement points
+  ; use it.
+  ;
+  ; Cost: per round, one firing of `work` and one of `revise`; the decision is
+  ; free. Rounds are bounded by the host, not by the program.
+  ;
+  ; Example:
+  ;   (pr-settled (pr-plan the-pull-request) pr-revised)
+  (~ pr-settled (work revise)
+    '(= seam (&)
+       (% (-> ,work
+            ($ "Show this to the reviewer and ask whether it is right. "
+               "Answer with exactly 1 if they accept it, or exactly 0 with "
+               "their objection if they do not."))
+          seam
+          (pr-settled (,revise seam) ,revise))))
+
+  ; (pr-revised note) — fold a reviewer's objection back into the plan.
+  ;
+  ;   note   the reviewer's own words, delivered by the port.
+  ;
+  ; The revision is told to change only what was objected to. A plan that is
+  ; rewritten wholesale between rounds cannot be agreed, because the reviewer is
+  ; reading a different document each time.
+  ;
+  ; Cost: one call.
+  (~ pr-revised (note)
+    (/ claude:haiku
+      (-> note
+      ($ "Revise the review plan to take this objection into account. Change "
+         "only what the objection touches; leave every other entry exactly as "
+         "it was, including its numbering. Restate the complete plan."))))
+
+  ; (pr-program plan) — turn an agreed plan into a Rebis program the host can
+  ; run as a nested run.
+  ;
+  ;   plan   the agreed plan, in the two-list shape `pr-plan` produces.
+  ;
+  ; The output is source, not prose: one stage per entry, arrows where a later
+  ; stage needs an earlier answer, squares where two readings should stay
+  ; independent until a mediator sees them, and a port wherever the host must
+  ; supply something the program cannot know. Every prompt in it is written to
+  ; be executable without further interpretation.
+  ;
+  ; This is the module's recursion. The generated program is handed back to the
+  ; host, which runs it as a run nested under this one; a stage of that program
+  ; may open a further run, and so on. Nothing here executes it — writing a
+  ; program and running a program are different acts, and keeping them apart is
+  ; what makes the plan reviewable before it costs anything.
+  ;
+  ; Cost: one call, plus whatever the generated program costs when the host
+  ; chooses to run it.
+  ;
+  ; Example:
+  ;   (pr-program the-agreed-plan)
+  (~ pr-program (plan)
+    (/ claude:opus5
+       (std-final-only
+      (-> plan
+        ($ "Write a Rebis program that carries out this plan. Emit source and "
+           "nothing else — no explanation, no fences.\n\n"
+           "Use one stage per plan entry. Use `->` where a stage needs the "
+           "previous answer. Use `([judge] a b)` where two readings should "
+           "stay independent until a mediator sees them. Use `(= name (&) body)` "
+           "wherever the host must supply something the program cannot know, "
+           "such as a command's output or a file's contents.\n\n"
+           "Every prompt must be executable as written by an agent with the "
+           "repository checked out. Name the file and the change in the prompt "
+           "itself rather than referring back to the plan.")))))
+
+  ; (pr-done program) — hand the program to the host, then agree the result.
+  ;
+  ;   program   the generated program, as source.
+  ;
+  ; The host runs it as a nested run and delivers what came of it; that delivery
+  ; is the subject of the second agreement loop. The reviewer is looking at the
+  ; work now rather than at the plan, so the loop is the same shape but the
+  ; question is different: not "is this the right plan" but "is this done".
+  ;
+  ; Cost: one port for the run, then the agreement loop.
+  ;
+  ; Example:
+  ;   (pr-done (pr-program the-agreed-plan))
+  (~ pr-done (program)
+    (pr-settled
+      '(= seam (&)
+         (-> ,program
+           ($ "Run this program as a nested run and report what came of it: "
+              "which changes were made, which comments were answered, and "
+              "what is still outstanding. Deliver the run's result through "
+              "the port.")))
+      pr-outstanding))
+
+  ; (pr-outstanding note) — the closing list, when the reviewer is not done.
+  ;
+  ;   note   the reviewer's objection to the executed work.
+  ;
+  ; Produces the same two lists the plan used — changes made and comments still
+  ; needing answers — so the second loop reads against the first. A round that
+  ; reports in a new format cannot be compared with the one before it.
+  ;
+  ; Cost: one call.
+  (~ pr-outstanding (note)
+    (/ claude:haiku
+       (-> note
+      ($ "List what is still outstanding after this objection, in the same two "
+         "lists the plan used: CHANGES still to make, and ANSWERS still to "
+         "post. Include what is already finished under a heading DONE so the "
+         "reviewer can see the whole state, not only the remainder."))))
+
+  ; (pr-review) — the whole review, from a reference to an agreed result.
+  ;
+  ; Fetch the pull request, read its threads, plan the answers and the changes,
+  ; agree the plan with the reviewer, write a program that carries it out, run
+  ; it as a nested run, and agree the result with the same reviewer.
+  ;
+  ; Both agreements are host ports. The program will not proceed past either one
+  ; until a person says so, and the reviewer's own words direct each retry.
+  ;
+  ; Cost: one fetch, four thread readings and a mediation, one plan, one
+  ; program, and two host-bounded loops. Everything after the first agreement is
+  ; paid only once the reviewer has accepted the plan.
+  ;
+  ; Example:
+  ;   (pr-review)
+  (~ pr-review ()
+    (pr-fetched pr-reviewed))
+
+  ; (pr-reviewed pr) — the review of one already-fetched pull request.
+  ;
+  ;   pr   the fetched pull request.
+  ;
+  ; Split from `pr-review` so a host that already has the pull request in hand
+  ; can start here without going through the port a second time.
+  ;
+  ; Cost: as `pr-review`, less the fetch.
+  ;
+  ; Example:
+  ;   (pr-reviewed the-pull-request)
+  (~ pr-reviewed (pr)
+    (pr-done (pr-program (pr-settled (pr-plan pr) pr-revised))))
+)

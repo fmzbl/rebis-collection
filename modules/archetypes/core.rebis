@@ -151,11 +151,14 @@
   ; Example:
   ;   (arch-round-trip std-final-only "Draft a one-step rollback procedure.")
   ;
-  ; Cost: worker fires std-twice by construction.
+  ; Cost: the material once, the worker twice — which is the point of the
+  ; figure. Only the worker is meant to run twice here; the material is one
+  ; thing seen from two sides, so it is bound rather than re-derived.
   (~ arch-round-trip (worker value)
-    '(-> (,worker ,value)
-         (<- ,value
-             (,worker ,value))))
+    '(= material ,value
+        (-> (,worker material)
+            (<- material
+                (,worker material)))))
 
   ; (arch-lazy-gate judge accepted rejected value) — evaluate judge first and
   ; expand only the chosen continuation. judge, accepted, and rejected are
@@ -176,12 +179,16 @@
   ;     std-one-word
   ;     "Is this rollout safe to execute?")
   ;
-  ; Cost: only the selected continuation fires, but value is evaluated in the
-  ; judge and selected branch wherever it is spliced.
+  ; Cost: the material once, the judge once, and only the selected
+  ; continuation. The material is bound before it is judged, so the thing the
+  ; judge ruled on is the thing the branch receives — spliced instead, a
+  ; computed material was derived afresh in each position and the gate ruled on
+  ; one version while the branch worked on another.
   (~ arch-lazy-gate (judge accepted rejected value)
-    '(% (,judge ,value)
-      (,accepted ,value)
-      (,rejected ,value)))
+    '(= material ,value
+        (% (,judge material)
+           (,accepted material)
+           (,rejected material))))
 
   ; (arch-audit-pair judge worker value) — independently derive the same value
   ; std-twice and mediate the pair. judge is a square mediator, so it may be a
@@ -201,9 +208,10 @@
   ;
   ; Cost: worker fires std-twice and the mediator sees both results.
   (~ arch-audit-pair (judge worker value)
-    '([,judge]
-      (,worker ,value)
-      (,worker ,value)))
+    '(= material ,value
+        ([,judge]
+         (,worker material)
+         (,worker material))))
 
   ; (arch-evidence-pass lens worker task) — make a worker answer three
   ; independent evidence passes: claim, support, and uncertainty.
@@ -271,7 +279,7 @@
   ;
   ; Cost: the worker runs in the judge and selected branch.
   (~ arch-input-review (worker judge)
-    '(& input
+    '(= input (&)
       (% (,judge (,worker input))
         (-> (,worker input)
             "Return only the reviewed result.")

@@ -13,6 +13,8 @@
   (# std/sieve)
   (# std/seam)
   (# std/shape)
+  (# std/imaginary)
+  (# std/amend)
 
   ; (sci-hypotheses judge observation) — competing explanations, each carrying
   ; its own prediction.
@@ -62,15 +64,27 @@
   ; Example:
   ;   (sci-experiment cheapest-decisive (sci-prediction ladder-claim))
   ;
-  ; Cost: three designs and one mediation.
+  ; The claim is bound OUTSIDE the imaginary space and the designs inside it.
+  ; That split is the whole point: the claim is a finding and belongs in the
+  ; record, while two of the three designs are about to be discarded, and a
+  ; discarded experiment design is long, specific, and full of the claim's own
+  ; vocabulary — exactly the shape that wins a later recall against the design
+  ; actually run.
+  ;
+  ; Cost: the hypothesis once, three designs, and one mediation. Unchanged: the
+  ; space is free. The claim is bound before the branches, so all three designs
+  ; are tests OF THE SAME claim — spliced instead, each branch derived its own
+  ; hypothesis and the mediator compared experiments for three different
+  ; theories.
   (~ sci-experiment (judge hypothesis)
-    '([,judge]
-      (-> ,hypothesis
-          "Design the cheapest test that would distinguish this claim from its closest rival. State the sample, the measurement, the decision rule chosen in advance, and the cost.")
-      (-> ,hypothesis
-          "Design the test that would most convincingly refute the claim if it is false. State what a defender would say about a negative result, and close that door in advance.")
-      (-> ,hypothesis
-          "Identify the cheapest evidence that already exists — logs, prior runs, published results — and what it can and cannot settle without new work.")))
+    '(= claim ,hypothesis
+        {([,judge]
+          (-> claim
+              "Design the cheapest test that would distinguish this claim from its closest rival. State the sample, the measurement, the decision rule chosen in advance, and the cost.")
+          (-> claim
+              "Design the test that would most convincingly refute the claim if it is false. State what a defender would say about a negative result, and close that door in advance.")
+          (-> claim
+              "Identify the cheapest evidence that already exists — logs, prior runs, published results — and what it can and cannot settle without new work."))}))
 
   ; (sci-falsify claim) — the honest inversion: argue the negation at full
   ; strength before the claim is allowed to stand.
@@ -85,6 +99,82 @@
   (~ sci-falsify (claim)
     '(-> ,claim
          "Argue the strongest case that this claim is false, using only evidence and mechanism, not tone. End with the single observation that would most efficiently settle the disagreement."))
+
+  ; (sci-survived claim) — argue the negation at full strength, keep only the
+  ; verdict on whether it stood.
+  ;
+  ;   claim   the claim under attack. Fires once, inside the space, so the
+  ;           refutation reads THAT claim rather than deriving a second one.
+  ;
+  ; sci-falsify returns the argument against the claim, which is what you want
+  ; when the argument is the deliverable. It is emphatically NOT what you want
+  ; when the claim survives: the record then holds a long, well-evidenced case
+  ; for the opposite of what the run concluded, written in the claim's own
+  ; vocabulary — and recall cannot tell a claim from its negation, because the
+  ; two differ by a word the tokenizer drops. Every later flashback on the
+  ; subject is then a coin toss between the finding and its best refutation.
+  ;
+  ; This is the falsification you can afford to run on a claim you intend to
+  ; keep. The attack happens, in full, and is forgotten; the verdict on whether
+  ; it landed is what becomes evidence.
+  ;
+  ; Example:
+  ;   (sci-survived (sci-record the-ladder-claim))
+  ;
+  ; Cost: the claim once, the refutation once, the verdict once. The space is
+  ; free.
+  (~ sci-survived (claim)
+    '{(= subject ,claim
+         (-> (sci-falsify subject)
+             "Did the claim survive this refutation? Answer in at most three lines: the claim as it now stands, whether the attack changed it, and the strongest surviving objection. Do not restate the case against it."))})
+
+  ; (sci-pilot design) — find out whether a test is worth running, without
+  ; remembering the pilot as though it were the result.
+  ;
+  ;   design   the experiment design to try in miniature. Fires once.
+  ;
+  ; A pilot exists to answer a question about the METHOD — is the measurement
+  ; even discriminating, is the sample reachable, does the decision rule fire.
+  ; Its numbers are not findings, and a record that holds them alongside real
+  ; results is a record where the two are indistinguishable at recall: same
+  ; subject, same vocabulary, and the pilot is usually the more recent.
+  ;
+  ; Example:
+  ;   (sci-pilot (sci-experiment cheapest-decisive the-latency-claim))
+  ;
+  ; The appraisal is marked, so a later pilot on the same subject recalls what
+  ; this one found out about the method. Two pilots discovering the same
+  ; instrumentation problem is the most avoidable cost in the family.
+  ;
+  ; Cost: the design once, the appraisal once. The mark is free.
+  (~ sci-pilot (design)
+    '{(! (-> ,design
+          "Run this design in miniature and report only on the METHOD: whether the measurement discriminates, whether the sample is reachable, whether the decision rule would have fired, and what it would cost at full size. Report no result for the underlying claim."))})
+
+  ; (sci-counterfactual claim without) — what would we have concluded without
+  ; this evidence?
+  ;
+  ;   claim     the conclusion as it stands, with everything known. Fires once.
+  ;   without   the evidence to withhold, named. Interpolated, never fired.
+  ;
+  ; The ablation arm, and the one macro here that could not exist without a
+  ; space at all. It reasons from a premise the run does not hold — and a
+  ; conclusion drawn from a premise the run rejects is the single worst thing
+  ; that can enter a record, because nothing downstream can tell it apart from
+  ; a conclusion the run actually reached.
+  ;
+  ; What crosses out is the sensitivity, not the counterfactual: how much of
+  ; the conclusion rested on that evidence.
+  ;
+  ; Example:
+  ;   (sci-counterfactual the-ladder-claim "the second replication")
+  ;
+  ; Cost: the claim once, the counterfactual once.
+  (~ sci-counterfactual (claim without)
+    '{(= standing ,claim
+         (-> standing
+             ($ "Set aside " ,without " entirely and reason as though it were never observed. State what conclusion the remaining evidence supports.")
+             ($ "How much of the original conclusion rested on " ,without "? Answer in at most three lines: what survives without it, what does not, and whether the claim should be weakened. State the conclusion that stands, never the one that does not.")))})
 
   ; (sci-tested forbids survives claim body) — hold a claim to both bars before
   ; it may be used: it must forbid an observation, and its negation must have
@@ -132,6 +222,33 @@
   (~ sci-adjudicate (claim upheld overturned)
     '(std-gated-by ,claim ,upheld ,overturned))
 
+  ; (sci-overturned subject claim) — record a refutation as the belief, not
+  ; beside it.
+  ;
+  ;   subject   what the claim is about, and the topic a later recall will use.
+  ;             Interpolated, never fired.
+  ;   claim     the finding that replaces what was believed. Fires once.
+  ;
+  ; sci-adjudicate sends a claim out and branches on the host's verdict, and an
+  ; overturned claim flows back into sci-hypotheses so a refutation restarts the
+  ; search. What nothing in the family did until now is take the old claim OUT
+  ; of the record — so the refuted version stayed evidence at full strength and
+  ; kept winning recalls against the thing that refuted it. In a family built
+  ; entirely around claims that must survive something, that is the one place
+  ; the memory layer contradicted the doctrine.
+  ;
+  ; Use this on the overturned branch, where the run has just learned it was
+  ; wrong about a named subject.
+  ;
+  ; Example:
+  ;   (sci-adjudicate (sci-experiment cheapest-decisive the-claim)
+  ;     (sci-record the-claim)
+  ;     (sci-overturned the-ladder-claim (sci-hypotheses most-discriminating the-claim)))
+  ;
+  ; Cost: exactly what the claim costs. The burial is free.
+  (~ sci-overturned (subject claim)
+    '(std-corrected ,subject ,claim))
+
   ; (sci-replicate judge claim) — independent re-derivation.
   ;
   ;   judge   mediator over the two derivations. Give it a phrasing that treats
@@ -141,13 +258,18 @@
   ; Two workers reach the result by routes chosen to share as little as
   ; possible — which is what makes their agreement evidence rather than an echo.
   ;
-  ; Cost: two derivations and one mediation.
+  ; Cost: the claim once, two derivations, one mediation. The claim is bound
+  ; before the branches, so both routes re-derive THE SAME result — spliced, a
+  ; computed claim was derived once per branch and the two routes could be
+  ; agreeing about different things, which is the one confound replication
+  ; exists to remove.
   (~ sci-replicate (judge claim)
-    '([,judge]
-      (-> ,claim
-          "Derive this result from first principles, stating each assumption as you use it. Do not consult the original argument's structure.")
-      (-> ,claim
-          "Reach this result by a deliberately different route — a different model, dataset, limiting case, or unit analysis. List the assumptions you did NOT share with a first-principles derivation.")))
+    '(= result ,claim
+        ([,judge]
+         (-> result
+             "Derive this result from first principles, stating each assumption as you use it. Do not consult the original argument's structure.")
+         (-> result
+             "Reach this result by a deliberately different route — a different model, dataset, limiting case, or unit analysis. List the assumptions you did NOT share with a first-principles derivation."))))
 
   ; (sci-record finding) — the durable form.
   ;
@@ -161,4 +283,53 @@
   (~ sci-record (finding)
     '(std-with-evidence
       (-> ,finding
-          "Record this result so it can be checked later: the question, the measurement and its conditions, the decision rule set in advance, the outcome, the confidence and what limits it, and the observation that would overturn it."))))
+          "Record this result so it can be checked later: the question, the measurement and its conditions, the decision rule set in advance, the outcome, the confidence and what limits it, and the observation that would overturn it.")))
+
+  ; (sci-established finding) — record a result and keep it past this run.
+  ;
+  ;   finding   the result to write up. Fires once.
+  ;
+  ; A recorded finding survives its run only in the transcript, where nothing
+  ; later reads it. This keeps the written-up result in the project's durable
+  ; memory, so a later run's flashback on the subject recalls the finding rather
+  ; than re-deriving it. That is what makes a body of work cumulative instead of
+  ; a sequence of unrelated sessions.
+  ;
+  ; Keep what was established, not what was drafted. A memory of drafts is a
+  ; memory nothing can be found in.
+  ;
+  ; Cost: one call — the same as sci-record. Keeping is free.
+  ;
+  ; Example:
+  ;   (sci-established (sci-adjudicate the-claim upheld overturned))
+  (~ sci-established (finding)
+    '(! (sci-record ,finding)))
+
+  ; (sci-rerun claim design) — run ONE experiment twice against the same claim
+  ; and report whether the two runs agree.
+  ;
+  ;   claim    the claim under test. Fires once, and both runs test that one.
+  ;   design   a one-argument caller macro producing a result from the claim.
+  ;
+  ; The complement of sci-replicate: that one varies the route and holds the
+  ; claim, this one holds both and varies only what a model does twice. It
+  ; measures the noise floor — how much of a disagreement is method and how much
+  ; is the model — which is the number every other comparison here is read
+  ; against.
+  ;
+  ; The two runs are instrumentation, so they are made inside an imaginary
+  ; space and only the agreement report crosses out. What a noise-floor
+  ; measurement is FOR is the number; two raw transcripts of the same
+  ; measurement, left in the record, are two more things every later recall on
+  ; the subject has to rank the finding against.
+  ;
+  ; Cost: the claim once, the design twice, and one mediation. The space is
+  ; free.
+  ;
+  ; Example:
+  ;   (sci-rerun the-latency-claim measure-it)
+  (~ sci-rerun (claim design)
+    '(= tested ,claim
+        {(["Do these two runs agree? Report the result, whether they agree within their stated conditions, and — if not — the most likely reason the second differed from the first."]
+          (,design tested)
+          (,design tested))})))

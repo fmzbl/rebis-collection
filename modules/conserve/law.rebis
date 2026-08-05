@@ -1,0 +1,116 @@
+; conserve/law — things a chain must not change.
+;
+; `@` holds a rule across every arrow in a scope. std/amend supplies the
+; structure and phrases nothing; this is the other half — the wordings for the
+; class of rule worth spending an operator on.
+;
+; The class: a CONSERVATION. Not "is this step good", which is a judgement and
+; belongs in a mediator, but "does this step preserve the thing that must not
+; change" — a quantity, an identity, a constraint that held before and must hold
+; after. Those are the rules a model can check reliably, because they are about
+; the two texts in front of it rather than about the world.
+;
+; Every macro here is phrased so the answer is 0 or 1 and nothing else, and
+; every one of them asks about a DIFFERENCE rather than about quality. A rule
+; that asks "is this good" gets 1 forever and costs a call per arrow to do it.
+;
+; The honest limit, stated once: a model comparing two texts is not a
+; verifier. Where a mechanical check exists — a parser, a balance, a test —
+; std/amend's std-holding-mechanically routes the same question to the host,
+; costs nothing, and cannot be talked out of its verdict by the step it judges.
+; Prefer that. These are for the case where no such check exists.
+(
+  (# std/amend)
+
+  ; (law-preserves subject) — the general conservation.
+  ;
+  ;   subject   what must not change, in the caller's words. Interpolated,
+  ;             never fired.
+  ;
+  ; Pass as the rule to `@` or std-holding. Every arrow in the scope is then
+  ; asked whether that one thing survived the step.
+  ;
+  ; Example:
+  ;   (std-holding (law-preserves "every requirement listed in the brief")
+  ;     (-> brief (draft-it) (tighten-it)))
+  ;
+  ; Cost: one call per arrow in the scope.
+  (~ law-preserves (subject)
+    ($ "Above are two texts: BEFORE, and AFTER, which was derived from it. "
+       "Answer with exactly 1 if AFTER still preserves " subject
+       ", and exactly 0 if it does not. Compare only the two texts. Do not "
+       "judge whether AFTER is good, well written, or an improvement — only "
+       "whether the thing named survived. Reply with a single character."))
+
+  ; (law-adds-nothing) — nothing appeared that was not derivable.
+  ;
+  ; The invariant against invention, and the one worth holding over any chain
+  ; that summarises, extracts, or reformats. A stage that quietly adds a fact
+  ; is the failure those chains actually have, and it is invisible at the end
+  ; because the added fact reads like the others.
+  ;
+  ; Cost: one call per arrow.
+  (~ law-adds-nothing ()
+    ($ "Above are two texts: BEFORE, and AFTER, which was derived from it. "
+       "Answer with exactly 1 if every claim in AFTER is supported by BEFORE, "
+       "and exactly 0 if AFTER asserts anything BEFORE does not support — a "
+       "number, a name, a cause, a certainty. Rewording is not adding. Reply "
+       "with a single character."))
+
+  ; (law-drops-nothing) — nothing required went missing.
+  ;
+  ; The complement, and the one that catches the opposite failure: a chain that
+  ; loses a constraint at step two and produces something coherent and wrong at
+  ; step five. Hold both when a chain must neither invent nor forget.
+  ;
+  ; Cost: one call per arrow.
+  (~ law-drops-nothing ()
+    ($ "Above are two texts: BEFORE, and AFTER, which was derived from it. "
+       "Answer with exactly 1 if AFTER still carries every constraint, "
+       "requirement, and qualification BEFORE stated, and exactly 0 if any was "
+       "dropped or weakened. Shortening is not dropping, as long as nothing "
+       "binding was lost. Reply with a single character."))
+
+  ; (law-answers-the-same-question) — the subject did not drift.
+  ;
+  ; Drift is the failure long chains have that no single step looks guilty of:
+  ; every stage is a reasonable response to the one before it, and stage six is
+  ; answering a question nobody asked. Held at every arrow, the drift is caught
+  ; at the step that introduced it rather than at the end.
+  ;
+  ; Cost: one call per arrow.
+  (~ law-answers-the-same-question ()
+    ($ "Above are two texts: BEFORE, and AFTER, which was derived from it. "
+       "Answer with exactly 1 if AFTER is still about the same question BEFORE "
+       "was about, and exactly 0 if the subject has shifted to something "
+       "adjacent. Going deeper is not shifting; changing what is being asked "
+       "is. Reply with a single character."))
+
+  ; (law-conserved subject work) — hold the conservation over the whole chain.
+  ;
+  ;   subject   what must not change, in the caller's words.
+  ;   work      the scope. Every arrow inside it is checked, at any depth.
+  ;
+  ; The assembled shape, and the one to reach for.
+  ;
+  ; Example:
+  ;   (law-conserved "every requirement in the brief"
+  ;     (-> brief (draft-it) (tighten-it) (format-it)))
+  ;
+  ; Cost: the work, plus one call per arrow in it. A refusal stops the scope,
+  ; so a broken chain costs less than a whole one.
+  (~ law-conserved (subject work)
+    '(@ (law-preserves ,subject) ,work))
+
+  ; (law-faithful work) — neither invents nor forgets, across the whole chain.
+  ;
+  ;   work   the scope.
+  ;
+  ; Both halves of faithfulness at once. Note the cost honestly: TWO calls per
+  ; arrow, because nested invariants each check every edge. On a four-stage
+  ; chain that is six checks for three stages of work. Worth it when the chain
+  ; is the deliverable; not worth it inside a loop.
+  ;
+  ; Cost: two calls per arrow, plus the work.
+  (~ law-faithful (work)
+    '(@ (law-adds-nothing) (@ (law-drops-nothing) ,work))))

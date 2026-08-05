@@ -17,6 +17,8 @@
   (# std/spiral)
   (# std/seam)
   (# std/shape)
+  (# std/imaginary)
+  (# std/memory)
 
   ; (forge-reproduce task) — establish a failing observation before anything is
   ; allowed to be called a cause.
@@ -149,6 +151,75 @@
   ; backstop, since the ladder has no base case of its own.
   (~ forge-repair (work gate cause seed grown)
     '(std-spiral forge-attempt forge-verdict ,work ,gate ,cause ,seed ,grown))
+
+  ; (forge-triage task) — decide what kind of bug this is before spending a
+  ; ladder on it, and remember only the decision.
+  ;
+  ;   task   the report. Fires once, inside the space.
+  ;
+  ; Choosing an approach means considering the approaches not taken, and those
+  ; are pure deliberation: three paragraphs about strategies this repair is
+  ; specifically not going to use, phrased in the bug's own vocabulary, sitting
+  ; in the record for the rest of the run. The repair loop that follows will
+  ; recall them every time it asks what is known about the failure.
+  ;
+  ; Example:
+  ;   (forge-triage "Cancelling a run leaves the child process alive.")
+  ;
+  ; Cost: the task once and the deliberation once. The space is free.
+  (~ forge-triage (task)
+    '{(-> ,task
+          "Decide how this failure should be approached: whether it needs reproduction first, whether it is a regression with a bisectable range, whether it is a design fault rather than a defect, and what the cheapest first move is. Weigh the alternatives, then give ONLY the decision and the one reason for it.")})
+
+  ; (forge-tried work judge) — attempt a fix in order to learn from it, not in
+  ; order to keep it.
+  ;
+  ;   work    the attempt. Fires once, inside the space.
+  ;   judge   a one-argument caller macro reading that attempt's answer.
+  ;
+  ; The spiral banishes attempts between rungs and distils a verdict across the
+  ; boundary, but the banished attempt is still evidence: std/spiral discards
+  ; the worker's CONTEXT, not the run's memory of what it said. A ladder of
+  ; five rejected patches leaves five patches in the record, all about the same
+  ; code, all more detailed than the verdict that survived them.
+  ;
+  ; This is the single-attempt version of that discipline done properly: the
+  ; attempt happens, the lesson crosses, the patch does not.
+  ;
+  ; The verdict is marked as well as returned, so it reaches the plane: the
+  ; next attempt at the same subject can recall it without it ever having been
+  ; evidence. That is the half std/spiral could not supply — the ladder throws
+  ; away a worker's CONTEXT, but the run went on remembering every patch it
+  ; wrote, and a rejected patch is longer and more specific than the verdict
+  ; that rejected it.
+  ;
+  ; Example:
+  ;   (forge-tried (repair the-cause) forge-verdict)
+  ;
+  ; Cost: the attempt once, the judgement once. The mark is free.
+  (~ forge-tried (work judge)
+    '{(= attempt ,work (! (,judge attempt)))})
+
+  ; (forge-informed subject work) — attempt something already knowing what the
+  ; earlier attempts on this subject ruled out.
+  ;
+  ;   subject   what to recall on. Interpolated as a topic, never fired.
+  ;   work      the attempt. Receives the accumulated verdicts as INPUT.
+  ;
+  ; The reading half of forge-tried, and the reason the pair exists: a repair
+  ; loop that cannot remember its own dead ends walks into them again, and one
+  ; that remembers them as evidence answers every later question about the bug
+  ; with a list of things that did not work.
+  ;
+  ; An empty plane recalls nothing, which does not flow, so this is also the
+  ; correct FIRST attempt — no special case for the opening rung.
+  ;
+  ; Example:
+  ;   (forge-informed the-cancellation-leak (repair the-cause))
+  ;
+  ; Cost: the work once. The recall is free.
+  (~ forge-informed (subject work)
+    '{(-> (? ,subject) ,work)})
 
   ; (forge-postmortem judge outcome) — turn a finished repair into something
   ; that changes the next one.
